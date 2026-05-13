@@ -1,0 +1,688 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="teeter_rotor">
+    <!-- ====================================================================== -->
+    <!-- DOCUMENTATION HEADER                                                    -->
+    <!-- ====================================================================== -->
+    <!--
+      Teeter Rotor PX4 v1.13 Gazebo Classic model.
+
+      Current model features:
+        - two large rotor blades
+        - independent blade pitch variables
+        - GP-76 engine visual placeholders
+        - engine torque dynamics from engines at 3 ft radius
+        - virtual payload force
+        - tripod mast between base and rotor hub
+        - no visible base box
+        - 11 degree pre-cone on blades
+        - visual-only blade pitch indicators
+
+      This is an intermediate engineering model.
+      It is intended for simulation architecture, design iteration, and PX4
+      integration work. It is not yet a full blade-element aerodynamic model.
+    -->
+    <pose>0 0 1.0 0 0 0</pose>
+    <static>false</static>
+
+    <!-- ====================================================================== -->
+    <!-- base_link                                                              -->
+    <!-- ====================================================================== -->
+    <!--
+      Non-rotating vehicle body reference.
+
+      The visible base box has been removed to better match the actual design.
+      This link still keeps inertial properties because Gazebo needs physical
+      mass and inertia for the vehicle body.
+
+      The tripod mast visuals are attached to this base_link.
+    -->
+    <link name="base_link">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>11.05</mass>
+        <inertia>
+          <ixx>8.0</ixx>
+          <iyy>8.0</iyy>
+          <izz>12.0</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+
+      <!-- ======================================================= -->
+      <!-- Tripod mast between base_link and rotor hub              -->
+      <!-- This is fixed to base_link and visually supports rotor   -->
+      <!-- area. It does not physically attach to spinning rotor_link. -->
+      <!-- ======================================================= -->
+      <visual name="tripod_mast_front_left_visual">
+        <pose>0.2250 0.1600 0.7500 0.000000 0.413028 -2.523448</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.3757</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="tripod_mast_front_right_visual">
+        <pose>0.2250 -0.1600 0.7500 0.000000 0.413028 2.523448</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.3757</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="tripod_mast_rear_visual">
+        <pose>-0.2400 0.0000 0.7500 0.000000 0.363979 0.000000</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.3483</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="tripod_mast_top_joint_visual">
+        <pose>0.0000 0.0000 1.3800 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.075</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.18 0.18 0.18 1</ambient>
+          <diffuse>0.18 0.18 0.18 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="tripod_mast_top_plate_visual">
+        <pose>0 0 1.34 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.18</radius>
+            <length>0.035</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.16 0.16 0.16 1</ambient>
+          <diffuse>0.16 0.16 0.16 1</diffuse>
+        </material>
+      </visual>
+
+    </link>
+
+    <!-- ====================================================================== -->
+    <!-- rotor_link                                                              -->
+    <!-- ====================================================================== -->
+    <!--
+      Simplified spinning rotor assembly.
+
+      Contains:
+        - two large blade visuals/collisions
+        - hub / teeter beam placeholder
+        - tip weights
+        - GP-76 engine visual placeholders
+
+      The rotor is still represented as one simplified spinning rigid link.
+      A true teeter hinge / flapping model is future work.
+    -->
+    <link name="rotor_link">
+      <pose>0 0 1.524 0 0 0</pose>
+      <inertial>
+        <mass>8.0</mass>
+        <inertia>
+          <ixx>18.0</ixx>
+          <iyy>18.0</iyy>
+          <izz>35.0</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+
+      <!-- Two-blade physical/simple rotor visual and collision. -->
+      <collision name="blade_1_collision">
+        <pose>2.2608 0 0.2617 0 -0.191986 0</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="blade_1_visual">
+        <pose>2.2608 0 0.2617 0 -0.191986 0</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </visual>
+
+      <collision name="blade_2_collision">
+        <pose>-2.2608 0 0.2617 0 -0.191986 3.14159265359</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="blade_2_visual">
+        <pose>-2.2608 0 0.2617 0 -0.191986 3.14159265359</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </visual>
+
+      <!-- Hub / teeter beam placeholder. -->
+      <collision name="hub_beam_collision">
+        <pose>0 0 0 0 1.57079632679 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.08</radius>
+            <length>1.8288</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="hub_beam_visual">
+        <pose>0 0 0 0 1.57079632679 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.08</radius>
+            <length>1.8288</length>
+          </cylinder>
+        </geometry>
+      </visual>
+
+      <visual name="tip_weight_1_visual">
+        <pose>3.6072 0 0.5234 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.08</radius>
+          </sphere>
+        </geometry>
+      </visual>
+      <visual name="tip_weight_2_visual">
+        <pose>-3.6072 0 0.5234 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.08</radius>
+          </sphere>
+        </geometry>
+      </visual>
+
+      <!-- Visible GP-76 engine placeholders at 3 ft radius.
+           Engine 1 is at +X, offset +Y; Engine 2 is at -X, offset -Y.
+           These are visual placeholders; drive torque is calculated in plugin. -->
+      <visual name="gp76_engine_1_body_visual">
+        <pose>0.9144 0.18 0.03 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.32 0.22 0.20</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_1_cylinder_visual">
+        <pose>0.9144 0.18 0.20 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.10</radius>
+            <length>0.18</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.55 0.55 0.55 1</ambient>
+          <diffuse>0.55 0.55 0.55 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_1_prop_disc_visual">
+        <pose>0.9144 0.42 0.03 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.22</radius>
+            <length>0.015</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.9 0.45</ambient>
+          <diffuse>0.1 0.1 0.9 0.45</diffuse>
+        </material>
+      </visual>
+
+      <visual name="gp76_engine_2_body_visual">
+        <pose>-0.9144 -0.18 0.03 0 0 3.14159265359</pose>
+        <geometry>
+          <box>
+            <size>0.32 0.22 0.20</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_2_cylinder_visual">
+        <pose>-0.9144 -0.18 0.20 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.10</radius>
+            <length>0.18</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.55 0.55 0.55 1</ambient>
+          <diffuse>0.55 0.55 0.55 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_2_prop_disc_visual">
+        <pose>-0.9144 -0.42 0.03 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.22</radius>
+            <length>0.015</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.9 0.45</ambient>
+          <diffuse>0.1 0.1 0.9 0.45</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <!-- Visual-only pitch indicators. -->
+    <link name="blade_1_pitch_indicator">
+      <pose>0 0 2.0 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <iyy>0.000001</iyy>
+          <izz>0.000001</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="blade_1_pitch_indicator_visual">
+        <geometry>
+          <box>
+            <size>2.7432 0.36 0.025</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0 0.9 0 1</ambient>
+          <diffuse>0 0.9 0 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <link name="blade_2_pitch_indicator">
+      <pose>0 0 2.0 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <iyy>0.000001</iyy>
+          <izz>0.000001</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="blade_2_pitch_indicator_visual">
+        <geometry>
+          <box>
+            <size>2.7432 0.36 0.025</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.9 0 0 1</ambient>
+          <diffuse>0.9 0 0 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="main_rotor_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_link</child>
+      <pose>0 0 1.524 0 0 0</pose>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+          <effort>10000</effort>
+          <velocity>1000</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.01</damping>
+          <friction>0.0</friction>
+        </dynamics>
+      </axis>
+    </joint>
+
+    <plugin name="teeter_rotor_plugin" filename="libteeter_rotor_plugin.so">
+      <!-- baseLinkName:
+           Name of the non-rotating vehicle body link. -->
+      <baseLinkName>base_link</baseLinkName>
+      <!-- rotorLinkName:
+           Name of the simplified spinning rotor assembly. -->
+      <rotorLinkName>rotor_link</rotorLinkName>
+      <blade1IndicatorLinkName>blade_1_pitch_indicator</blade1IndicatorLinkName>
+      <blade2IndicatorLinkName>blade_2_pitch_indicator</blade2IndicatorLinkName>
+      <!-- jointName:
+           Revolute joint connecting base_link and rotor_link. -->
+      <jointName>main_rotor_joint</jointName>
+
+      <!-- ================================================================== -->
+      <!-- Runtime Gazebo command topics                                       -->
+      <!-- ================================================================== -->
+      <!-- enableCommandTopics:
+           true  = subscribe to Gazebo topics so commands can be changed live.
+           false = use only the SDF values. -->
+      <enableCommandTopics>true</enableCommandTopics>
+
+      <!-- commandTopicNamespace:
+           Topic namespace under /gazebo/default/.
+           Default topics:
+             /gazebo/default/teeter_rotor/cyclic_cmd
+             /gazebo/default/teeter_rotor/engine_cmd
+
+           cyclic_cmd uses gazebo.msgs.Vector3d:
+             x = collectiveDeg
+             y = rollCyclicDeg
+             z = pitchCyclicDeg
+
+           engine_cmd uses gazebo.msgs.Vector3d:
+             x = engineThrottle
+             y = cyclicPhaseOffsetDeg
+             z = unused for now
+      -->
+      <commandTopicNamespace>teeter_rotor</commandTopicNamespace>
+
+      <!-- Primary test variables -->
+      <!-- targetRpm:
+           If useEngineDynamics=false, this directly forces rotor RPM.
+           If useEngineDynamics=true, this is only the initial RPM at spawn.
+           Unit: rpm. -->
+      <targetRpm>0.0</targetRpm>
+      <!-- payloadWeightLb:
+           Virtual payload weight in pounds-force.
+           Applied as a downward force by the plugin.
+           It does not yet change inertia or center of gravity.
+
+           Typical tests:
+             360 lb -> should lift clearly
+             398 lb -> near 440 lb design gross
+             420 lb -> 10:1 payload-to-empty target, likely overloaded -->
+      <payloadWeightLb>360.0</payloadWeightLb>
+      <!-- blade1PitchDeg:
+           Pitch command for blade 1 in degrees.
+           Design/reference value: 7.27 deg. -->
+      <blade1PitchDeg>7.27</blade1PitchDeg>
+      <!-- blade2PitchDeg:
+           Pitch command for blade 2 in degrees.
+           Equal blade1/blade2 pitch gives mostly symmetric lift.
+           Different fixed pitch creates rotating imbalance, not true cyclic control. -->
+      <blade2PitchDeg>7.27</blade2PitchDeg>
+
+      <!-- ================================================================== -->
+      <!-- Azimuth-based cyclic pitch                                          -->
+      <!-- ================================================================== -->
+      <!-- useCyclicPitch:
+           false = use fixed blade1PitchDeg and blade2PitchDeg.
+           true  = compute blade pitch from rotor azimuth every update.
+
+           Cyclic pitch formula :
+             blade_pitch = collectiveDeg
+                         + rollCyclicDeg  * cos(azimuth + cyclicPhaseOffsetDeg)
+                         + pitchCyclicDeg * sin(azimuth + cyclicPhaseOffsetDeg)
+
+           Blade 2 is evaluated 180 degrees away from blade 1.
+      -->
+      <useCyclicPitch>true</useCyclicPitch>
+
+      <!-- collectiveDeg:
+           Mean blade pitch for both blades.
+           This replaces fixed blade pitch when useCyclicPitch=true.
+           Start with the design/reference value of 7.27 deg. -->
+      <collectiveDeg>7.27</collectiveDeg>
+
+      <!-- rollCyclicDeg:
+           Cyclic pitch amplitude used to create roll control moment.
+           Start very small: 0.0 to 1.0 deg.
+           Sign/phase may need tuning after observing Gazebo response. -->
+      <rollCyclicDeg>0.0</rollCyclicDeg>
+
+      <!-- pitchCyclicDeg:
+           Cyclic pitch amplitude used to create pitch control moment.
+           Start very small: 0.0 to 1.0 deg.
+           Sign/phase may need tuning after observing Gazebo response. -->
+      <pitchCyclicDeg>0.0</pitchCyclicDeg>
+
+      <!-- cyclicPhaseOffsetDeg:
+           Phase tuning knob.
+           Helicopter/rotor systems often need phase correction.
+           Start at 0 deg, then tune sign and phase after observing response. -->
+      <cyclicPhaseOffsetDeg>0.0</cyclicPhaseOffsetDeg>
+
+      <!-- Engine dynamics -->
+      <!-- useEngineDynamics:
+           true  = compute rotor RPM from engine torque and drag torque.
+           false = force rotor RPM using targetRpm.
+
+           Use false for debugging lift at a known RPM.
+           Use true for spin-up and engine behavior tests. -->
+      <useEngineDynamics>true</useEngineDynamics>
+      <!-- engineThrottle:
+           Normalized throttle for both GP-76 engines.
+           Range: 0.0 to 1.0.
+           1.0 should settle near 220 rpm with current kTorque. -->
+      <engineThrottle>0.001</engineThrottle>
+      <!-- engineRadiusFt:
+           Distance from rotor center to each engine thrust line.
+           Given design value: 3 ft.
+           This is the torque arm for engine thrust. -->
+      <engineRadiusFt>3.0</engineRadiusFt>
+      <!-- engineThrustLbEach:
+           Maximum thrust from each GP-76 engine/prop unit.
+           Given design value: 54 lbf each.
+
+           Full throttle drive torque:
+             2 engines * 54 lbf * 3 ft = 324 ft-lb ≈ 439 N*m -->
+      <engineThrustLbEach>54.0</engineThrustLbEach>
+      <!-- Step 1/2 tuning: increase rotorInertiaKgm2 for slower spool-up, decrease for faster spool-up. -->
+      <!-- rotorInertiaKgm2:
+           Effective rotational inertia of the rotor system.
+           Larger value = slower RPM spool-up.
+           Smaller value = faster RPM spool-up.
+           Replace with SolidWorks rotor inertia when available. -->
+      <rotorInertiaKgm2>35.0</rotorInertiaKgm2>
+      <!-- kTorque:
+           Rotor drag torque coefficient.
+
+           Model:
+             drag_torque = kTorque * omega^2
+
+           Derived from:
+             325 ft-lb = 440.6 N*m
+             220 rpm = 23.038 rad/s
+             kTorque = 440.6 / 23.038^2 ≈ 0.831 -->
+      <kTorque>0.831</kTorque>
+
+      <!-- Visual-only pitch indicators -->
+      <!-- showPitchIndicators:
+           Enables green/red visual-only blade pitch plates. -->
+      <showPitchIndicators>true</showPitchIndicators>
+      <!-- animatePitchIndicators:
+           If true, visual pitch indicators oscillate so pitch motion is easy to see.
+           This is visual-only and does not change lift calculation. -->
+      <animatePitchIndicators>false</animatePitchIndicators>
+      <!-- pitchIndicatorAnimationAmplitudeDeg:
+           Visual-only pitch animation amplitude in degrees. -->
+      <pitchIndicatorAnimationAmplitudeDeg>5.0</pitchIndicatorAnimationAmplitudeDeg>
+      <!-- pitchIndicatorAnimationFrequencyHz:
+           Visual-only pitch animation frequency in Hz. -->
+      <pitchIndicatorAnimationFrequencyHz>0.25</pitchIndicatorAnimationFrequencyHz>
+      <!-- pitchIndicatorVerticalOffsetM:
+           Raises the pitch indicators above the blades for visibility. -->
+      <pitchIndicatorVerticalOffsetM>0.18</pitchIndicatorVerticalOffsetM>
+
+      <!-- Fixed constants -->
+      <!-- emptyWeightLb:
+           Target empty vehicle weight.
+           Given design value: 42 lb.
+           Current SDF inertial masses approximate this empty weight. -->
+      <emptyWeightLb>42.0</emptyWeightLb>
+      <!-- kThrust:
+           Equivalent rotor lift coefficient.
+
+           Model:
+             lift = kThrust * omega^2 * pitch_factor
+
+           Current value makes about 440 lbf at 220 rpm and 7.27 deg pitch.
+           Unit: N/(rad/s)^2. -->
+      <kThrust>3.69</kThrust>
+      <!-- maxRpm:
+           Maximum rotor RPM.
+           Given design value: 220 rpm.
+           Engine dynamics clamp rotor speed to this value. -->
+      <maxRpm>220.0</maxRpm>
+
+      <!-- Pitch model -->
+      <!-- hoverPitchDeg:
+           Reference pitch where pitch_factor = 1.0.
+           Given design condition: 440 lb at 7.27 deg. -->
+      <hoverPitchDeg>7.27</hoverPitchDeg>
+      <!-- zeroLiftPitchDeg:
+           Simple linear model zero-lift reference pitch.
+           Tuning parameter, not exact airfoil zero-lift angle. -->
+      <zeroLiftPitchDeg>1.0</zeroLiftPitchDeg>
+      <!-- minPitchDeg:
+           Lower pitch clamp.
+           Given collective range lower bound: 2 deg. -->
+      <minPitchDeg>2.0</minPitchDeg>
+      <!-- maxPitchDeg:
+           Upper pitch clamp.
+           Given collective range upper bound: 12 deg. -->
+      <maxPitchDeg>12.0</maxPitchDeg>
+
+      <!-- Rotor metadata -->
+      <!-- rotorRadiusFt:
+           Rotor radius from center to blade tip.
+           Given value: 12 ft. -->
+      <rotorRadiusFt>12.0</rotorRadiusFt>
+      <!-- hubRadiusFt:
+           Hub radius / blade start radius.
+           Also matches engine radial location in this simplified layout.
+           Given value: 3 ft. -->
+      <hubRadiusFt>3.0</hubRadiusFt>
+      <!-- numBlades:
+           Number of large rotor blades. -->
+      <numBlades>2</numBlades>
+      <!-- bladeChordIn:
+           Blade chord.
+           Given value: 10.5 inches. -->
+      <bladeChordIn>10.5</bladeChordIn>
+      <!-- airfoil:
+           Airfoil metadata.
+           Not used yet in current equivalent lift model.
+           Future blade-element model should use this. -->
+      <airfoil>NACA23015</airfoil>
+      <!-- tipSpeedFps:
+           Tip speed at 220 rpm.
+           Given value: 276 ft/s. -->
+      <tipSpeedFps>276.0</tipSpeedFps>
+      <!-- designGrossWeightLb:
+           Design gross weight at 7.27 deg collective.
+           Given value: 440 lb. -->
+      <designGrossWeightLb>440.0</designGrossWeightLb>
+      <!-- tipWeightLb:
+           Tip weight per blade.
+           Given value: 2.53 lb. -->
+      <tipWeightLb>2.53</tipWeightLb>
+      <!-- bladeSpanwiseDensityLbFt:
+           Approximate blade spanwise density.
+           Given value: about 0.3 lb/ft. -->
+      <bladeSpanwiseDensityLbFt>0.3</bladeSpanwiseDensityLbFt>
+      <!-- forwardSpeedMph:
+           Design forward speed metadata.
+           Not used yet in current force model. -->
+      <forwardSpeedMph>20.0</forwardSpeedMph>
+      <!-- rotorTwistDeg:
+           Blade twist metadata.
+           Given value: 6 deg linear twist.
+           Future blade-element model should use this. -->
+      <rotorTwistDeg>6.0</rotorTwistDeg>
+      <!-- rotorPlaneHeightFt:
+           Rotor plane height above ground.
+           Given value: 5 ft = 1.524 m. -->
+      <rotorPlaneHeightFt>5.0</rotorPlaneHeightFt>
+      <!-- teeterAngleLimitDeg:
+           Teeter hinge range metadata.
+           Given value: +/- 15 deg.
+           True teeter hinge is not implemented yet. -->
+      <teeterAngleLimitDeg>15.0</teeterAngleLimitDeg>
+      <!-- preConeAngleDeg:
+           Blade pre-cone angle.
+           Given value: about 11 deg.
+
+           Implemented:
+             blade visual/collision tilted upward
+             tip weights raised
+             blade force application points include pre-cone offset -->
+      <preConeAngleDeg>11.0</preConeAngleDeg>
+      <!-- gyroPrecessionTorqueFtLb:
+           Gyroscopic precession torque metadata.
+           Not directly used yet. -->
+      <gyroPrecessionTorqueFtLb>262.0</gyroPrecessionTorqueFtLb>
+      <!-- torqueRequiredFtLb:
+           Rotor torque required at design condition.
+           Used to justify kTorque. -->
+      <torqueRequiredFtLb>325.0</torqueRequiredFtLb>
+      <!-- equivalentShaftHp:
+           Equivalent shaft horsepower metadata.
+           Given value: 16 hp. -->
+      <equivalentShaftHp>16.0</equivalentShaftHp>
+      <!-- propulsiveEfficiency:
+           Design assumption metadata. -->
+      <propulsiveEfficiency>0.85</propulsiveEfficiency>
+      <!-- numEngines:
+           Number of GP-76 engines. -->
+      <numEngines>2</numEngines>
+      <!-- engineHpEach:
+           GP-76 power metadata.
+           Current torque model uses thrust and radius, not HP curve. -->
+      <engineHpEach>8.0</engineHpEach>
+      <!-- mainBladeSparOdMm:
+           Main blade spar outer diameter metadata. -->
+      <mainBladeSparOdMm>30.0</mainBladeSparOdMm>
+      <!-- mainBladeSparIdMm:
+           Main blade spar inner diameter metadata. -->
+      <mainBladeSparIdMm>28.0</mainBladeSparIdMm>
+    </plugin>
+
+  </model>
+</sdf>
