@@ -3,10 +3,13 @@
 #include <gazebo/common/common.hh>
 #include <gazebo/transport/transport.hh>
 #include <gazebo/msgs/msgs.hh>
+#include <CommandMotorSpeed.pb.h>
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <string>
+#include <boost/shared_ptr.hpp>
 
 namespace gazebo
 {
@@ -30,8 +33,6 @@ public:
     this->ReadString(sdf, "blade1IndicatorLinkName", blade1_indicator_link_name);
     this->ReadString(sdf, "blade2IndicatorLinkName", blade2_indicator_link_name);
     this->ReadString(sdf, "jointName", joint_name);
-    this->ReadBool(sdf, "enableCommandTopics", this->enable_command_topics_);
-    this->ReadString(sdf, "commandTopicNamespace", this->command_topic_namespace_);
 
     this->base_link_ = this->model_->GetLink(base_link_name);
     this->rotor_link_ = this->model_->GetLink(rotor_link_name);
@@ -72,6 +73,28 @@ public:
     this->ReadDouble(sdf, "rollCyclicDeg", this->roll_cyclic_deg_);
     this->ReadDouble(sdf, "pitchCyclicDeg", this->pitch_cyclic_deg_);
     this->ReadDouble(sdf, "cyclicPhaseOffsetDeg", this->cyclic_phase_offset_deg_);
+    this->ReadString(sdf, "cyclicCommandFrame", this->cyclic_command_frame_);
+    this->ReadBool(sdf, "swapCyclicInputs", this->swap_cyclic_inputs_);
+    this->ReadDouble(sdf, "rollCyclicSign", this->roll_cyclic_sign_);
+    this->ReadDouble(sdf, "pitchCyclicSign", this->pitch_cyclic_sign_);
+
+    // PX4 actuator bridge.
+    this->ReadBool(sdf, "enablePx4ActuatorInput", this->enable_px4_actuator_input_);
+    this->ReadString(sdf, "px4ActuatorTopic", this->px4_actuator_topic_);
+    this->ReadString(sdf, "px4InputMode", this->px4_input_mode_);
+    this->ReadDouble(sdf, "px4MotorSpeedScale", this->px4_motor_speed_scale_);
+    this->ReadDouble(sdf, "px4ThrottleZeroRaw", this->px4_throttle_zero_raw_);
+    this->ReadDouble(sdf, "px4ThrottleFullRaw", this->px4_throttle_full_raw_);
+    this->ReadDouble(sdf, "px4CollectiveZeroRaw", this->px4_collective_zero_raw_);
+    this->ReadDouble(sdf, "px4CollectiveFullRaw", this->px4_collective_full_raw_);
+    this->ReadDouble(sdf, "minCollectiveCmdDeg", this->min_collective_cmd_deg_);
+    this->ReadDouble(sdf, "maxCollectiveCmdDeg", this->max_collective_cmd_deg_);
+    this->ReadDouble(sdf, "maxCyclicDeg", this->max_cyclic_deg_);
+    this->ReadDouble(sdf, "cyclicMomentPerDegNm", this->cyclic_moment_per_deg_nm_);
+    this->ReadDouble(sdf, "cyclicLateralForcePerDegN", this->cyclic_lateral_force_per_deg_n_);
+    this->ReadDouble(sdf, "px4CommandTimeoutSec", this->px4_command_timeout_sec_);
+    this->ReadBool(sdf, "printPx4InputDebug", this->print_px4_input_debug_);
+    this->ReadDouble(sdf, "px4InputDebugIntervalSec", this->px4_input_debug_interval_sec_);
 
     // Engine dynamics.
     this->ReadBool(sdf, "useEngineDynamics", this->use_engine_dynamics_);
@@ -153,24 +176,20 @@ public:
     this->solidity_ = static_cast<double>(this->num_blades_) * this->blade_chord_m_ /
       (M_PI * this->rotor_radius_m_);
 
-    if (this->enable_command_topics_) {
+    if (this->enable_px4_actuator_input_) {
       this->node_.reset(new transport::Node());
       this->node_->Init(this->model_->GetWorld()->Name());
 
-      const std::string cyclic_topic = "~/" + this->command_topic_namespace_ + "/cyclic_cmd";
-      const std::string engine_topic = "~/" + this->command_topic_namespace_ + "/engine_cmd";
+      this->px4_motor_speed_sub_ =
+        this->node_->Subscribe(this->px4_actuator_topic_,
+          &TeeterRotorPlugin::OnPx4MotorSpeed, this);
 
-      this->cyclic_cmd_sub_ =
-        this->node_->Subscribe(cyclic_topic, &TeeterRotorPlugin::OnCyclicCmd, this);
-      this->engine_cmd_sub_ =
-        this->node_->Subscribe(engine_topic, &TeeterRotorPlugin::OnEngineCmd, this);
-
-      gzmsg << "[TeeterRotorPlugin] Runtime command topics enabled:\n"
-            << "  /gazebo/" << this->model_->GetWorld()->Name()
-            << "/" << this->command_topic_namespace_ << "/cyclic_cmd\n"
-            << "  /gazebo/" << this->model_->GetWorld()->Name()
-            << "/" << this->command_topic_namespace_ << "/engine_cmd\n"
-            << std::endl;
+      std::cout << "[TeeterRotorPlugin] PX4 actuator bridge enabled. Topic: "
+                << this->px4_actuator_topic_
+                << ", input debug: " << (this->print_px4_input_debug_ ? "on" : "off")
+                << ", interval: " << this->px4_input_debug_interval_sec_
+                << " sec"
+                << std::endl;
     }
 
     this->PrintFactSheet();
@@ -418,41 +437,167 @@ private:
   }
 
 
-  void OnCyclicCmd(ConstVector3dPtr &_msg)
+  double Clamp01(double value) const
   {
-    if (!_msg) {
-      return;
-    }
-
-    this->collective_deg_ = this->ClampPitchDeg(_msg->x());
-    this->roll_cyclic_deg_ = std::max(-10.0, std::min(_msg->y(), 10.0));
-    this->pitch_cyclic_deg_ = std::max(-10.0, std::min(_msg->z(), 10.0));
-
-    gzmsg << "[TeeterRotorPlugin] cyclic_cmd received: collective="
-          << this->collective_deg_
-          << " deg, rollCyclic="
-          << this->roll_cyclic_deg_
-          << " deg, pitchCyclic="
-          << this->pitch_cyclic_deg_
-          << " deg"
-          << std::endl;
+    return std::max(0.0, std::min(value, 1.0));
   }
 
-  void OnEngineCmd(ConstVector3dPtr &_msg)
+  double NormalizePx4MotorSpeed(double motor_speed) const
+  {
+    const double scale = std::max(1e-6, this->px4_motor_speed_scale_);
+    return this->Clamp01(motor_speed / scale);
+  }
+
+  double NormalizePx4MotorSpeedRange(double motor_speed, double zero_raw, double full_raw) const
+  {
+    const double span = std::max(1e-6, full_raw - zero_raw);
+    return this->Clamp01((motor_speed - zero_raw) / span);
+  }
+
+  double Map01ToSigned(double value01, double max_abs) const
+  {
+    return (2.0 * this->Clamp01(value01) - 1.0) * max_abs;
+  }
+
+  void OnPx4MotorSpeed(const boost::shared_ptr<const mav_msgs::msgs::CommandMotorSpeed> &_msg)
   {
     if (!_msg) {
       return;
     }
 
-    this->engine_throttle_ = this->ClampEngineThrottle(_msg->x());
-    this->cyclic_phase_offset_deg_ = _msg->y();
+    if (_msg->motor_speed_size() < 4) {
+      gzerr << "[TeeterRotorPlugin] PX4 motor_speed message has fewer than 4 channels: "
+            << _msg->motor_speed_size() << std::endl;
+      return;
+    }
 
-    gzmsg << "[TeeterRotorPlugin] engine_cmd received: throttle="
-          << this->engine_throttle_
-          << ", phaseOffset="
-          << this->cyclic_phase_offset_deg_
-          << " deg"
-          << std::endl;
+    const bool all_outputs_zero =
+      std::fabs(_msg->motor_speed(0)) < 1e-6 &&
+      std::fabs(_msg->motor_speed(1)) < 1e-6 &&
+      std::fabs(_msg->motor_speed(2)) < 1e-6 &&
+      std::fabs(_msg->motor_speed(3)) < 1e-6;
+
+    const double ch0 = all_outputs_zero ? 0.0 :
+      this->NormalizePx4MotorSpeedRange(_msg->motor_speed(0),
+        this->px4_throttle_zero_raw_, this->px4_throttle_full_raw_);
+    const double ch1 = all_outputs_zero ? 0.0 :
+      this->NormalizePx4MotorSpeedRange(_msg->motor_speed(1),
+        this->px4_collective_zero_raw_, this->px4_collective_full_raw_);
+    const double ch2 = all_outputs_zero ? 0.5 : this->NormalizePx4MotorSpeed(_msg->motor_speed(2));
+    const double ch3 = all_outputs_zero ? 0.5 : this->NormalizePx4MotorSpeed(_msg->motor_speed(3));
+
+    this->px4_engine_throttle_cmd_ = this->ClampEngineThrottle(ch0);
+    this->px4_collective_deg_cmd_ =
+      this->min_collective_cmd_deg_
+      + ch1 * (this->max_collective_cmd_deg_ - this->min_collective_cmd_deg_);
+
+    this->px4_roll_cyclic_deg_cmd_ =
+      this->Map01ToSigned(ch2, this->max_cyclic_deg_);
+    this->px4_pitch_cyclic_deg_cmd_ =
+      this->Map01ToSigned(ch3, this->max_cyclic_deg_);
+
+    this->last_px4_command_time_ = this->model_->GetWorld()->SimTime();
+    this->has_px4_command_ = true;
+
+    const double debug_interval = std::max(0.02, this->px4_input_debug_interval_sec_);
+    if (this->print_px4_input_debug_ &&
+        (this->last_px4_command_time_ - this->last_px4_print_time_).Double() > debug_interval) {
+      std::cout << "[TeeterRotorPlugin][PX4 INPUT] "
+                << "raw=["
+                << _msg->motor_speed(0) << ", "
+                << _msg->motor_speed(1) << ", "
+                << _msg->motor_speed(2) << ", "
+                << _msg->motor_speed(3) << "] "
+                << "norm=["
+                << ch0 << ", "
+                << ch1 << ", "
+                << ch2 << ", "
+                << ch3 << "] "
+                << "cmd={"
+                << "throttle:" << this->px4_engine_throttle_cmd_
+                << ", collective_deg:" << this->px4_collective_deg_cmd_
+                << ", roll_cyclic_deg:" << this->px4_roll_cyclic_deg_cmd_
+                << ", pitch_cyclic_deg:" << this->px4_pitch_cyclic_deg_cmd_
+                << "}"
+                << std::endl;
+
+      this->last_px4_print_time_ = this->last_px4_command_time_;
+    }
+  }
+
+  bool Px4CommandActive(const common::Time &now) const
+  {
+    if (!this->enable_px4_actuator_input_ || !this->has_px4_command_) {
+      return false;
+    }
+
+    return (now - this->last_px4_command_time_).Double() <= this->px4_command_timeout_sec_;
+  }
+
+  void ApplyPx4CommandsIfActive(const common::Time &now)
+  {
+    if (!this->Px4CommandActive(now)) {
+      if (this->enable_px4_actuator_input_) {
+        this->engine_throttle_ = 0.0;
+        this->collective_deg_ = this->min_collective_cmd_deg_;
+        this->roll_cyclic_deg_ = 0.0;
+        this->pitch_cyclic_deg_ = 0.0;
+        this->cyclic_world_north_deg_ = 0.0;
+        this->cyclic_world_east_deg_ = 0.0;
+        this->use_cyclic_pitch_ = true;
+      }
+      return;
+    }
+
+    double roll_cyclic_cmd = this->px4_roll_cyclic_deg_cmd_;
+    double pitch_cyclic_cmd = this->px4_pitch_cyclic_deg_cmd_;
+
+    if (this->swap_cyclic_inputs_) {
+      std::swap(roll_cyclic_cmd, pitch_cyclic_cmd);
+    }
+
+    roll_cyclic_cmd *= this->roll_cyclic_sign_ >= 0.0 ? 1.0 : -1.0;
+    pitch_cyclic_cmd *= this->pitch_cyclic_sign_ >= 0.0 ? 1.0 : -1.0;
+
+    if (this->cyclic_command_frame_ == "world") {
+      this->cyclic_world_north_deg_ = pitch_cyclic_cmd;
+      this->cyclic_world_east_deg_ = roll_cyclic_cmd;
+#if GAZEBO_MAJOR_VERSION >= 8
+      const ignition::math::Pose3d base_pose = this->base_link_->WorldPose();
+      const ignition::math::Vector3d cyclic_world(roll_cyclic_cmd, pitch_cyclic_cmd, 0.0);
+      const ignition::math::Vector3d cyclic_body = base_pose.Rot().RotateVectorReverse(cyclic_world);
+      pitch_cyclic_cmd = cyclic_body.X();
+      roll_cyclic_cmd = cyclic_body.Y();
+#else
+      const gazebo::math::Pose base_pose = this->base_link_->GetWorldPose();
+      const gazebo::math::Vector3 cyclic_world(roll_cyclic_cmd, pitch_cyclic_cmd, 0.0);
+      const gazebo::math::Vector3 cyclic_body = base_pose.rot.RotateVectorReverse(cyclic_world);
+      pitch_cyclic_cmd = cyclic_body.x;
+      roll_cyclic_cmd = cyclic_body.y;
+#endif
+    } else {
+#if GAZEBO_MAJOR_VERSION >= 8
+      const ignition::math::Pose3d base_pose = this->base_link_->WorldPose();
+      const ignition::math::Vector3d cyclic_body(pitch_cyclic_cmd, roll_cyclic_cmd, 0.0);
+      const ignition::math::Vector3d cyclic_world = base_pose.Rot().RotateVector(cyclic_body);
+      this->cyclic_world_east_deg_ = cyclic_world.X();
+      this->cyclic_world_north_deg_ = cyclic_world.Y();
+#else
+      const gazebo::math::Pose base_pose = this->base_link_->GetWorldPose();
+      const gazebo::math::Vector3 cyclic_body(pitch_cyclic_cmd, roll_cyclic_cmd, 0.0);
+      const gazebo::math::Vector3 cyclic_world = base_pose.rot.RotateVector(cyclic_body);
+      this->cyclic_world_east_deg_ = cyclic_world.x;
+      this->cyclic_world_north_deg_ = cyclic_world.y;
+#endif
+    }
+
+    this->engine_throttle_ = this->px4_engine_throttle_cmd_;
+    this->collective_deg_ = this->ClampPitchDeg(this->px4_collective_deg_cmd_);
+    this->roll_cyclic_deg_ = std::max(-this->max_cyclic_deg_,
+      std::min(roll_cyclic_cmd, this->max_cyclic_deg_));
+    this->pitch_cyclic_deg_ = std::max(-this->max_cyclic_deg_,
+      std::min(pitch_cyclic_cmd, this->max_cyclic_deg_));
+    this->use_cyclic_pitch_ = true;
   }
 
   void PrintFactSheet() const
@@ -475,10 +620,18 @@ private:
           << ", roll cyclic: " << this->roll_cyclic_deg_
           << ", pitch cyclic: " << this->pitch_cyclic_deg_
           << ", phase: " << this->cyclic_phase_offset_deg_ << " deg\n"
+          << "Cyclic command frame: " << this->cyclic_command_frame_ << "\n"
+          << "Cyclic input tuning: swap=" << (this->swap_cyclic_inputs_ ? "true" : "false")
+          << ", roll sign=" << (this->roll_cyclic_sign_ >= 0.0 ? 1 : -1)
+          << ", pitch sign=" << (this->pitch_cyclic_sign_ >= 0.0 ? 1 : -1) << "\n"
           << "Pre-cone: " << this->pre_cone_angle_deg_ << " deg, force point x/z: "
           << this->blade_lift_x_m_ << " / " << this->blade_lift_z_m_ << " m\n"
-          << "Command topics: " << (this->enable_command_topics_ ? "on" : "off")
-          << ", namespace: " << this->command_topic_namespace_ << "\n"
+          << "PX4 bridge: " << (this->enable_px4_actuator_input_ ? "on" : "off")
+          << ", topic: " << this->px4_actuator_topic_
+          << ", scale: " << this->px4_motor_speed_scale_ << "\n"
+          << "PX4 mapping: ch0 throttle, ch1 collective, ch2 roll cyclic, ch3 pitch cyclic\n"
+          << "Cyclic moment assist: " << this->cyclic_moment_per_deg_nm_ << " N*m/deg\n"
+          << "Cyclic lateral force assist: " << this->cyclic_lateral_force_per_deg_n_ << " N/deg\n"
           << "==========================================================\n"
           << std::endl;
   }
@@ -491,6 +644,8 @@ private:
     }
 
     const common::Time now = this->model_->GetWorld()->SimTime();
+    const bool px4_command_active = this->Px4CommandActive(now);
+    this->ApplyPx4CommandsIfActive(now);
     const double omega_cmd = this->StepRotorOmega(now);
     this->StepRotorAzimuth(now, omega_cmd);
 
@@ -526,7 +681,9 @@ private:
     const ignition::math::Vector3d blade2_force_world =
       rotor_pose.Rot().RotateVector(ignition::math::Vector3d(0.0, 0.0, blade2_lift_n));
 
-    const ignition::math::Vector3d payload_force_world(0.0, 0.0, -this->payload_weight_n_);
+    const double payload_force_n = (!this->enable_px4_actuator_input_ || px4_command_active)
+      ? this->payload_weight_n_ : 0.0;
+    const ignition::math::Vector3d payload_force_world(0.0, 0.0, -payload_force_n);
 #else
     const gazebo::math::Pose rotor_pose = this->rotor_link_->GetWorldPose();
 
@@ -543,23 +700,59 @@ private:
     const gazebo::math::Vector3 blade2_force_world =
       rotor_pose.rot.RotateVector(gazebo::math::Vector3(0.0, 0.0, blade2_lift_n));
 
-    const gazebo::math::Vector3 payload_force_world(0.0, 0.0, -this->payload_weight_n_);
+    const double payload_force_n = (!this->enable_px4_actuator_input_ || px4_command_active)
+      ? this->payload_weight_n_ : 0.0;
+    const gazebo::math::Vector3 payload_force_world(0.0, 0.0, -payload_force_n);
 #endif
 
     this->base_link_->AddForceAtWorldPosition(blade1_force_world, blade1_pos_world);
     this->base_link_->AddForceAtWorldPosition(blade2_force_world, blade2_pos_world);
     this->base_link_->AddForce(payload_force_world);
 
+    if (px4_command_active && this->cyclic_lateral_force_per_deg_n_ > 0.0) {
+#if GAZEBO_MAJOR_VERSION >= 8
+      const ignition::math::Vector3d cyclic_lateral_force_world(
+        this->cyclic_world_east_deg_ * this->cyclic_lateral_force_per_deg_n_,
+        this->cyclic_world_north_deg_ * this->cyclic_lateral_force_per_deg_n_,
+        0.0);
+#else
+      const gazebo::math::Vector3 cyclic_lateral_force_world(
+        this->cyclic_world_east_deg_ * this->cyclic_lateral_force_per_deg_n_,
+        this->cyclic_world_north_deg_ * this->cyclic_lateral_force_per_deg_n_,
+        0.0);
+#endif
+      this->base_link_->AddForce(cyclic_lateral_force_world);
+    }
+
+    if (px4_command_active && this->cyclic_moment_per_deg_nm_ > 0.0) {
+#if GAZEBO_MAJOR_VERSION >= 8
+      const ignition::math::Pose3d base_pose = this->base_link_->WorldPose();
+      const ignition::math::Vector3d cyclic_torque_body(
+        this->roll_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
+        this->pitch_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
+        0.0);
+      this->base_link_->AddTorque(base_pose.Rot().RotateVector(cyclic_torque_body));
+#else
+      const gazebo::math::Pose base_pose = this->base_link_->GetWorldPose();
+      const gazebo::math::Vector3 cyclic_torque_body(
+        this->roll_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
+        this->pitch_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
+        0.0);
+      this->base_link_->AddTorque(base_pose.rot.RotateVector(cyclic_torque_body));
+#endif
+    }
+
     if ((now - this->last_print_time_).Double() > 1.0) {
       const double rpm = RadPerSecToRpm(omega_cmd);
       const double total_lift = blade1_lift_n + blade2_lift_n;
-      const double net_n = total_lift - this->payload_weight_n_ - this->EmptyWeightNewton();
+      const double net_n = total_lift - payload_force_n - this->EmptyWeightNewton();
 
       gzmsg << "[TeeterRotorPlugin] rpm = "
             << rpm
             << ", payload = " << this->payload_weight_lb_ << " lb"
             << ", azimuth = " << this->rotor_azimuth_rad_ * 180.0 / M_PI << " deg"
             << ", blade pitches = [" << blade1_pitch_cmd_deg << ", " << blade2_pitch_cmd_deg << "] deg"
+            << ", cyclic = [" << this->roll_cyclic_deg_ << ", " << this->pitch_cyclic_deg_ << "] deg"
             << ", total lift = " << total_lift << " N"
             << ", net = " << net_n << " N"
             << ", drive torque = " << this->DriveTorqueNewtonMeter() << " N*m"
@@ -571,12 +764,34 @@ private:
   }
 
 private:
-  // Runtime command topics.
-  bool enable_command_topics_{true};
-  std::string command_topic_namespace_{"teeter_rotor"};
+  // PX4 actuator bridge.
+  bool enable_px4_actuator_input_{true};
+  std::string px4_actuator_topic_{"~/command/motor_speed"};
+  std::string px4_input_mode_{"motor_speed"};
+  double px4_motor_speed_scale_{1000.0};
+  double px4_throttle_zero_raw_{500.0};
+  double px4_throttle_full_raw_{1000.0};
+  double px4_collective_zero_raw_{500.0};
+  double px4_collective_full_raw_{1000.0};
+  double min_collective_cmd_deg_{2.0};
+  double max_collective_cmd_deg_{12.0};
+  double max_cyclic_deg_{2.0};
+  double cyclic_moment_per_deg_nm_{35.0};
+  double cyclic_lateral_force_per_deg_n_{0.0};
+  double px4_command_timeout_sec_{0.5};
+  bool print_px4_input_debug_{true};
+  double px4_input_debug_interval_sec_{0.2};
+
+  bool has_px4_command_{false};
+  double px4_engine_throttle_cmd_{0.0};
+  double px4_collective_deg_cmd_{7.27};
+  double px4_roll_cyclic_deg_cmd_{0.0};
+  double px4_pitch_cyclic_deg_cmd_{0.0};
+  common::Time last_px4_command_time_{0};
+  common::Time last_px4_print_time_{0};
+
   transport::NodePtr node_;
-  transport::SubscriberPtr cyclic_cmd_sub_;
-  transport::SubscriberPtr engine_cmd_sub_;
+  transport::SubscriberPtr px4_motor_speed_sub_;
 
   physics::ModelPtr model_;
   physics::LinkPtr base_link_;
@@ -597,7 +812,13 @@ private:
   double collective_deg_{7.27};
   double roll_cyclic_deg_{0.0};
   double pitch_cyclic_deg_{0.0};
+  double cyclic_world_north_deg_{0.0};
+  double cyclic_world_east_deg_{0.0};
   double cyclic_phase_offset_deg_{0.0};
+  std::string cyclic_command_frame_{"body"};
+  bool swap_cyclic_inputs_{false};
+  double roll_cyclic_sign_{1.0};
+  double pitch_cyclic_sign_{1.0};
   double rotor_azimuth_rad_{0.0};
   bool azimuth_time_initialized_{false};
   common::Time last_azimuth_update_time_{0};

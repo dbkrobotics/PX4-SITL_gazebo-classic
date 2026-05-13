@@ -213,6 +213,29 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
   getSdfParam<std::string>(_sdf, "magSubTopic", mag_sub_topic_, mag_sub_topic_);
   getSdfParam<std::string>(_sdf, "baroSubTopic", baro_sub_topic_, baro_sub_topic_);
   getSdfParam<std::string>(_sdf, "groundtruthSubTopic", groundtruth_sub_topic_, groundtruth_sub_topic_);
+  getSdfParam<bool>(_sdf, "derotateImuToBaseLink", derotate_imu_to_base_link_, derotate_imu_to_base_link_);
+  getSdfParam<std::string>(_sdf, "derotateImuBaseLinkName", derotate_imu_base_link_name_,
+      derotate_imu_base_link_name_);
+  getSdfParam<std::string>(_sdf, "derotateImuSensorLinkName", derotate_imu_sensor_link_name_,
+      derotate_imu_sensor_link_name_);
+
+  if (derotate_imu_to_base_link_) {
+    derotate_imu_base_link_ = model_->GetLink(derotate_imu_base_link_name_);
+    derotate_imu_sensor_link_ = model_->GetLink(derotate_imu_sensor_link_name_);
+
+    if (!derotate_imu_base_link_ || !derotate_imu_sensor_link_) {
+      gzerr << "[gazebo_mavlink_interface] IMU de-rotation requested but links were not found. "
+            << "base='" << derotate_imu_base_link_name_ << "' found=" << static_cast<bool>(derotate_imu_base_link_)
+            << ", sensor='" << derotate_imu_sensor_link_name_ << "' found=" << static_cast<bool>(derotate_imu_sensor_link_)
+            << ". Disabling de-rotation.\n";
+      derotate_imu_to_base_link_ = false;
+    } else {
+      gzmsg << "[gazebo_mavlink_interface] IMU de-rotation enabled. "
+            << "sensor='" << derotate_imu_sensor_link_name_
+            << "' -> base='" << derotate_imu_base_link_name_
+            << "'\n";
+    }
+  }
 
   // set input_reference_ from inputs.control
   input_reference_.resize(n_out_max);
@@ -698,15 +721,25 @@ void GazeboMavlinkInterface::SendSensorMessages()
   // send always accel and gyro data (not dependent of the bitmask)
   // required so to keep the timestamps on sync and the lockstep can
   // work properly
-  ignition::math::Vector3d accel_b = q_FLU_to_FRD.RotateVector(ignition::math::Vector3d(
+  ignition::math::Vector3d accel_flu = ignition::math::Vector3d(
     last_imu_message_.linear_acceleration().x(),
     last_imu_message_.linear_acceleration().y(),
-    last_imu_message_.linear_acceleration().z()));
+    last_imu_message_.linear_acceleration().z());
 
-  ignition::math::Vector3d gyro_b = q_FLU_to_FRD.RotateVector(ignition::math::Vector3d(
+  ignition::math::Vector3d gyro_flu = ignition::math::Vector3d(
     last_imu_message_.angular_velocity().x(),
     last_imu_message_.angular_velocity().y(),
-    last_imu_message_.angular_velocity().z()));
+    last_imu_message_.angular_velocity().z());
+
+  if (derotate_imu_to_base_link_ && derotate_imu_base_link_ && derotate_imu_sensor_link_) {
+    const ignition::math::Quaterniond sensor_to_world = derotate_imu_sensor_link_->WorldPose().Rot();
+    const ignition::math::Quaterniond base_to_world = derotate_imu_base_link_->WorldPose().Rot();
+    accel_flu = base_to_world.RotateVectorReverse(sensor_to_world.RotateVector(accel_flu));
+    gyro_flu = base_to_world.RotateVectorReverse(derotate_imu_base_link_->WorldAngularVel());
+  }
+
+  const ignition::math::Vector3d accel_b = q_FLU_to_FRD.RotateVector(accel_flu);
+  const ignition::math::Vector3d gyro_b = q_FLU_to_FRD.RotateVector(gyro_flu);
 
   SensorData::Imu imu_data;
   imu_data.accel_b = Eigen::Vector3d(accel_b.X(), accel_b.Y(), accel_b.Z());
