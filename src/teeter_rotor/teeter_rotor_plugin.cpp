@@ -24,18 +24,21 @@ public:
 
     std::string base_link_name = "base_link";
     std::string rotor_link_name = "rotor_link";
+    std::string payload_link_name = "payload_link";
     std::string blade1_indicator_link_name = "blade_1_pitch_indicator";
     std::string blade2_indicator_link_name = "blade_2_pitch_indicator";
     std::string joint_name = "main_rotor_joint";
 
     this->ReadString(sdf, "baseLinkName", base_link_name);
     this->ReadString(sdf, "rotorLinkName", rotor_link_name);
+    this->ReadString(sdf, "payloadLinkName", payload_link_name);
     this->ReadString(sdf, "blade1IndicatorLinkName", blade1_indicator_link_name);
     this->ReadString(sdf, "blade2IndicatorLinkName", blade2_indicator_link_name);
     this->ReadString(sdf, "jointName", joint_name);
 
     this->base_link_ = this->model_->GetLink(base_link_name);
     this->rotor_link_ = this->model_->GetLink(rotor_link_name);
+    this->payload_link_ = this->model_->GetLink(payload_link_name);
     this->blade1_indicator_link_ = this->model_->GetLink(blade1_indicator_link_name);
     this->blade2_indicator_link_ = this->model_->GetLink(blade2_indicator_link_name);
     this->joint_ = this->model_->GetJoint(joint_name);
@@ -47,6 +50,10 @@ public:
     if (!this->rotor_link_) {
       gzerr << "[TeeterRotorPlugin] Rotor link not found: " << rotor_link_name << std::endl;
       return;
+    }
+    if (!this->payload_link_) {
+      gzwarn << "[TeeterRotorPlugin] Payload link not found: " << payload_link_name
+             << ". Payload parameters will not change model mass/inertia." << std::endl;
     }
     if (!this->blade1_indicator_link_) {
       gzerr << "[TeeterRotorPlugin] Blade 1 indicator link not found: " << blade1_indicator_link_name << std::endl;
@@ -64,6 +71,13 @@ public:
     // Primary variables.
     this->ReadDouble(sdf, "targetRpm", this->target_rpm_);
     this->ReadDouble(sdf, "payloadWeightLb", this->payload_weight_lb_);
+    this->ReadBool(sdf, "payloadEnabled", this->payload_enabled_);
+    this->ReadDouble(sdf, "payloadMassLb", this->payload_mass_lb_);
+    this->ReadVector3(sdf, "payloadOffsetFromCogM", this->payload_offset_from_cog_m_);
+    this->ReadDouble(sdf, "payloadOuterDiameterIn", this->payload_outer_diameter_in_);
+    this->ReadDouble(sdf, "payloadInnerDiameterIn", this->payload_inner_diameter_in_);
+    this->ReadDouble(sdf, "payloadThicknessIn", this->payload_thickness_in_);
+    this->ReadDouble(sdf, "payloadDisabledScale", this->payload_disabled_scale_);
     this->ReadDouble(sdf, "blade1PitchDeg", this->blade1_pitch_deg_);
     this->ReadDouble(sdf, "blade2PitchDeg", this->blade2_pitch_deg_);
 
@@ -91,7 +105,8 @@ public:
     this->ReadDouble(sdf, "maxCollectiveCmdDeg", this->max_collective_cmd_deg_);
     this->ReadDouble(sdf, "maxCyclicDeg", this->max_cyclic_deg_);
     this->ReadDouble(sdf, "cyclicMomentPerDegNm", this->cyclic_moment_per_deg_nm_);
-    this->ReadDouble(sdf, "cyclicLateralForcePerDegN", this->cyclic_lateral_force_per_deg_n_);
+    this->ReadDouble(sdf, "cyclicDiskTiltPerDeg", this->cyclic_disk_tilt_per_deg_);
+    this->ReadDouble(sdf, "maxCyclicDiskTiltDeg", this->max_cyclic_disk_tilt_deg_);
     this->ReadDouble(sdf, "px4CommandTimeoutSec", this->px4_command_timeout_sec_);
     this->ReadBool(sdf, "printPx4InputDebug", this->print_px4_input_debug_);
     this->ReadDouble(sdf, "px4InputDebugIntervalSec", this->px4_input_debug_interval_sec_);
@@ -121,6 +136,11 @@ public:
     this->ReadDouble(sdf, "zeroLiftPitchDeg", this->zero_lift_pitch_deg_);
     this->ReadDouble(sdf, "minPitchDeg", this->min_pitch_deg_);
     this->ReadDouble(sdf, "maxPitchDeg", this->max_pitch_deg_);
+    this->ReadBool(sdf, "useBladeElementLift", this->use_blade_element_lift_);
+    this->ReadDouble(sdf, "airDensityKgM3", this->air_density_kgm3_);
+    this->ReadDouble(sdf, "bladeLiftSlopePerRad", this->blade_lift_slope_per_rad_);
+    this->ReadInt(sdf, "bladeElementSections", this->blade_element_sections_);
+    this->ReadDouble(sdf, "bladeElementLiftScale", this->blade_element_lift_scale_);
 
     // Metadata.
     this->ReadDouble(sdf, "rotorRadiusFt", this->rotor_radius_ft_);
@@ -157,15 +177,20 @@ public:
     this->rotor_omega_ = this->target_omega_;
 
     this->empty_weight_kg_ = LbMassToKg(this->empty_weight_lb_);
-    this->payload_mass_kg_ = LbMassToKg(this->payload_weight_lb_);
+    this->payload_mass_kg_ = this->payload_enabled_ ? LbMassToKg(this->payload_mass_lb_) : 0.0;
+    this->physical_payload_weight_n_ = this->payload_enabled_ ? LbForceToN(this->payload_mass_lb_) : 0.0;
     this->payload_weight_n_ = LbForceToN(this->payload_weight_lb_);
-    this->current_gross_weight_lb_ = this->empty_weight_lb_ + this->payload_weight_lb_;
+    this->current_gross_weight_lb_ = this->empty_weight_lb_
+      + (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0)
+      + this->payload_weight_lb_;
     this->current_gross_weight_n_ = LbForceToN(this->current_gross_weight_lb_);
 
     this->engine_radius_m_ = FtToM(this->engine_radius_ft_);
     this->engine_thrust_n_each_ = LbForceToN(this->engine_thrust_lb_each_);
     this->max_drive_torque_nm_ =
       static_cast<double>(this->num_engines_) * this->engine_thrust_n_each_ * this->engine_radius_m_;
+    this->engine_available_power_w_ =
+      HpToW(this->equivalent_shaft_hp_) * this->propulsive_efficiency_;
 
     this->blade_effective_span_m_ = this->rotor_radius_m_ - this->hub_radius_m_;
     this->blade_lift_radius_m_ = 0.5 * (this->rotor_radius_m_ + this->hub_radius_m_);
@@ -175,6 +200,17 @@ public:
     this->disk_area_m2_ = M_PI * this->rotor_radius_m_ * this->rotor_radius_m_;
     this->solidity_ = static_cast<double>(this->num_blades_) * this->blade_chord_m_ /
       (M_PI * this->rotor_radius_m_);
+
+    if (this->use_blade_element_lift_ && this->blade_element_lift_scale_ <= 0.0) {
+      const double design_lift_n = LbForceToN(this->design_gross_weight_lb_);
+      const double design_blade_lift_n =
+        this->BladeElementLiftNewtonUnscaled(this->max_omega_, this->hover_pitch_deg_);
+      const double design_total_lift_n =
+        std::max(1.0, static_cast<double>(this->num_blades_) * design_blade_lift_n);
+      this->blade_element_lift_scale_ = design_lift_n / design_total_lift_n;
+    }
+
+    this->ConfigurePayloadLink();
 
     if (this->enable_px4_actuator_input_) {
       this->node_.reset(new transport::Node());
@@ -237,6 +273,50 @@ private:
     }
   }
 
+  void ReadVector3(sdf::ElementPtr sdf, const std::string &name, ignition::math::Vector3d &value)
+  {
+    if (sdf->HasElement(name)) {
+      value = sdf->Get<ignition::math::Vector3d>(name);
+    }
+  }
+
+  void ConfigurePayloadLink()
+  {
+    if (!this->payload_link_) {
+      return;
+    }
+
+    const bool enabled = this->payload_enabled_ && this->payload_mass_lb_ > 0.0;
+    const double mass_kg = enabled ? this->payload_mass_kg_ : this->disabled_payload_mass_kg_;
+    const double geometry_scale = enabled ? 1.0 : std::max(0.01, this->payload_disabled_scale_);
+    const double outer_radius_m = geometry_scale *
+      std::max(0.001, 0.5 * InToM(this->payload_outer_diameter_in_));
+    const double inner_radius_m = geometry_scale *
+      std::max(0.0, 0.5 * InToM(this->payload_inner_diameter_in_));
+    const double thickness_m = geometry_scale *
+      std::max(0.001, InToM(this->payload_thickness_in_));
+    const double radius_term = outer_radius_m * outer_radius_m + inner_radius_m * inner_radius_m;
+    const double ixx_iyy = (mass_kg / 12.0) * (3.0 * radius_term + thickness_m * thickness_m);
+    const double izz = 0.5 * mass_kg * radius_term;
+
+    physics::InertialPtr inertial(new physics::Inertial);
+    inertial->SetMass(mass_kg);
+    inertial->SetCoG(0.0, 0.0, 0.0);
+    inertial->SetInertiaMatrix(ixx_iyy, ixx_iyy, izz, 0.0, 0.0, 0.0);
+    this->payload_link_->SetInertial(inertial);
+    this->payload_link_->SetGravityMode(true);
+    this->payload_link_->SetScale(ignition::math::Vector3d(
+      geometry_scale,
+      geometry_scale,
+      geometry_scale));
+
+    const ignition::math::Pose3d payload_pose(
+      this->payload_offset_from_cog_m_,
+      ignition::math::Quaterniond(0.0, 0.0, 0.0));
+    this->payload_link_->SetInitialRelativePose(payload_pose);
+    this->payload_link_->SetRelativePose(payload_pose);
+  }
+
   double PitchFactor(double pitch_deg) const
   {
     const double pitch = std::max(this->min_pitch_deg_, std::min(pitch_deg, this->max_pitch_deg_));
@@ -255,7 +335,37 @@ private:
 
   double BladeLiftNewton(double omega, double pitch_deg) const
   {
+    if (this->use_blade_element_lift_) {
+      return this->blade_element_lift_scale_ *
+        this->BladeElementLiftNewtonUnscaled(omega, pitch_deg);
+    }
+
     return 0.5 * this->k_thrust_ * omega * omega * this->PitchFactor(pitch_deg);
+  }
+
+  double BladeElementLiftNewtonUnscaled(double omega, double pitch_deg) const
+  {
+    const int sections = std::max(1, this->blade_element_sections_);
+    const double root_radius = std::max(0.0, std::min(this->hub_radius_m_, this->rotor_radius_m_));
+    const double span = std::max(0.0, this->rotor_radius_m_ - root_radius);
+    double lift_n = 0.0;
+
+    for (int i = 0; i < sections; ++i) {
+      const double r0 = root_radius + span * static_cast<double>(i) / static_cast<double>(sections);
+      const double r1 = root_radius + span * static_cast<double>(i + 1) / static_cast<double>(sections);
+      const double r = 0.5 * (r0 + r1);
+      const double mu = span > 1e-6 ? (r - root_radius) / span : 0.0;
+      const double local_pitch_deg = pitch_deg + (0.5 - mu) * this->rotor_twist_deg_;
+      const double alpha_rad = DegToRad(local_pitch_deg - this->zero_lift_pitch_deg_);
+      const double cl = std::max(0.0, this->blade_lift_slope_per_rad_ * alpha_rad);
+      const double local_speed = omega * r;
+      const double dr = r1 - r0;
+
+      lift_n += 0.5 * this->air_density_kgm3_ * local_speed * local_speed *
+        this->blade_chord_m_ * cl * dr;
+    }
+
+    return lift_n;
   }
 
   double EmptyWeightNewton() const
@@ -268,9 +378,14 @@ private:
     return std::max(0.0, std::min(throttle, 1.0));
   }
 
-  double DriveTorqueNewtonMeter() const
+  double DriveTorqueNewtonMeter(double omega) const
   {
-    return this->ClampEngineThrottle(this->engine_throttle_) * this->max_drive_torque_nm_;
+    const double torque_from_power_nm =
+      this->engine_available_power_w_ / std::max(omega, 1e-3);
+    const double drive_torque_limit_nm =
+      std::min(this->max_drive_torque_nm_, torque_from_power_nm);
+
+    return this->ClampEngineThrottle(this->engine_throttle_) * drive_torque_limit_nm;
   }
 
   double DragTorqueNewtonMeter(double omega) const
@@ -298,7 +413,7 @@ private:
     }
     dt = std::min(dt, 0.02);
 
-    const double drive_torque_nm = this->DriveTorqueNewtonMeter();
+    const double drive_torque_nm = this->DriveTorqueNewtonMeter(this->rotor_omega_);
     const double drag_torque_nm = this->DragTorqueNewtonMeter(this->rotor_omega_);
     const double net_torque_nm = drive_torque_nm - drag_torque_nm;
 
@@ -500,29 +615,29 @@ private:
     this->has_px4_command_ = true;
 
     const double debug_interval = std::max(0.02, this->px4_input_debug_interval_sec_);
-    if (this->print_px4_input_debug_ &&
-        (this->last_px4_command_time_ - this->last_px4_print_time_).Double() > debug_interval) {
-      std::cout << "[TeeterRotorPlugin][PX4 INPUT] "
-                << "raw=["
-                << _msg->motor_speed(0) << ", "
-                << _msg->motor_speed(1) << ", "
-                << _msg->motor_speed(2) << ", "
-                << _msg->motor_speed(3) << "] "
-                << "norm=["
-                << ch0 << ", "
-                << ch1 << ", "
-                << ch2 << ", "
-                << ch3 << "] "
-                << "cmd={"
-                << "throttle:" << this->px4_engine_throttle_cmd_
-                << ", collective_deg:" << this->px4_collective_deg_cmd_
-                << ", roll_cyclic_deg:" << this->px4_roll_cyclic_deg_cmd_
-                << ", pitch_cyclic_deg:" << this->px4_pitch_cyclic_deg_cmd_
-                << "}"
-                << std::endl;
+    // if (this->print_px4_input_debug_ &&
+    //     (this->last_px4_command_time_ - this->last_px4_print_time_).Double() > debug_interval) {
+    //   std::cout << "[TeeterRotorPlugin][PX4 INPUT] "
+    //             << "raw=["
+    //             << _msg->motor_speed(0) << ", "
+    //             << _msg->motor_speed(1) << ", "
+    //             << _msg->motor_speed(2) << ", "
+    //             << _msg->motor_speed(3) << "] "
+    //             << "norm=["
+    //             << ch0 << ", "
+    //             << ch1 << ", "
+    //             << ch2 << ", "
+    //             << ch3 << "] "
+    //             << "cmd={"
+    //             << "throttle:" << this->px4_engine_throttle_cmd_
+    //             << ", collective_deg:" << this->px4_collective_deg_cmd_
+    //             << ", roll_cyclic_deg:" << this->px4_roll_cyclic_deg_cmd_
+    //             << ", pitch_cyclic_deg:" << this->px4_pitch_cyclic_deg_cmd_
+    //             << "}"
+    //             << std::endl;
 
-      this->last_px4_print_time_ = this->last_px4_command_time_;
-    }
+    //   this->last_px4_print_time_ = this->last_px4_command_time_;
+    // }
   }
 
   bool Px4CommandActive(const common::Time &now) const
@@ -610,9 +725,19 @@ private:
           << "Num engines: " << this->num_engines_ << "\n"
           << "Max drive torque: " << this->max_drive_torque_nm_
           << " N*m / " << this->max_drive_torque_nm_ / 1.3558179483314 << " ft-lb\n"
+          << "Engine available rotor power: " << this->engine_available_power_w_
+          << " W / " << this->engine_available_power_w_ / HpToW(1.0) << " hp\n"
           << "kTorque: " << this->k_torque_ << " N*m/(rad/s)^2\n"
           << "Rotor inertia: " << this->rotor_inertia_kgm2_ << " kg*m^2\n"
-          << "Payload: " << this->payload_weight_lb_ << " lb\n"
+          << "Blade element lift: " << (this->use_blade_element_lift_ ? "on" : "off")
+          << ", sections: " << this->blade_element_sections_
+          << ", scale: " << this->blade_element_lift_scale_ << "\n"
+          << "Physical payload: " << (this->payload_enabled_ ? "on" : "off")
+          << ", mass: " << (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0) << " lb"
+          << ", offset from CoG: [" << this->payload_offset_from_cog_m_.X()
+          << ", " << this->payload_offset_from_cog_m_.Y()
+          << ", " << this->payload_offset_from_cog_m_.Z() << "] m\n"
+          << "Legacy virtual payload force: " << this->payload_weight_lb_ << " lb\n"
           << "Fixed blade pitches: [" << this->blade1_pitch_deg_ << ", "
           << this->blade2_pitch_deg_ << "] deg\n"
           << "Cyclic pitch: " << (this->use_cyclic_pitch_ ? "on" : "off")
@@ -631,7 +756,8 @@ private:
           << ", scale: " << this->px4_motor_speed_scale_ << "\n"
           << "PX4 mapping: ch0 throttle, ch1 collective, ch2 roll cyclic, ch3 pitch cyclic\n"
           << "Cyclic moment assist: " << this->cyclic_moment_per_deg_nm_ << " N*m/deg\n"
-          << "Cyclic lateral force assist: " << this->cyclic_lateral_force_per_deg_n_ << " N/deg\n"
+          << "Cyclic disk tilt force: " << this->cyclic_disk_tilt_per_deg_
+          << " disk-deg/cyclic-deg, max " << this->max_cyclic_disk_tilt_deg_ << " deg\n"
           << "==========================================================\n"
           << std::endl;
   }
@@ -664,6 +790,7 @@ private:
 
     const double blade1_lift_n = this->BladeLiftNewton(omega_cmd, blade1_pitch_cmd_deg);
     const double blade2_lift_n = this->BladeLiftNewton(omega_cmd, blade2_pitch_cmd_deg);
+    const double total_lift_n = blade1_lift_n + blade2_lift_n;
 
 #if GAZEBO_MAJOR_VERSION >= 8
     const ignition::math::Pose3d rotor_pose = this->rotor_link_->WorldPose();
@@ -709,19 +836,33 @@ private:
     this->base_link_->AddForceAtWorldPosition(blade2_force_world, blade2_pos_world);
     this->base_link_->AddForce(payload_force_world);
 
-    if (px4_command_active && this->cyclic_lateral_force_per_deg_n_ > 0.0) {
+    double east_disk_tilt_deg = 0.0;
+    double north_disk_tilt_deg = 0.0;
+    double east_disk_tilt_force_n = 0.0;
+    double north_disk_tilt_force_n = 0.0;
+
+    if (px4_command_active && this->cyclic_disk_tilt_per_deg_ > 0.0) {
+      east_disk_tilt_deg = std::max(-this->max_cyclic_disk_tilt_deg_,
+        std::min(this->cyclic_world_east_deg_ * this->cyclic_disk_tilt_per_deg_,
+          this->max_cyclic_disk_tilt_deg_));
+      north_disk_tilt_deg = std::max(-this->max_cyclic_disk_tilt_deg_,
+        std::min(this->cyclic_world_north_deg_ * this->cyclic_disk_tilt_per_deg_,
+          this->max_cyclic_disk_tilt_deg_));
+      east_disk_tilt_force_n = total_lift_n * std::tan(DegToRad(east_disk_tilt_deg));
+      north_disk_tilt_force_n = total_lift_n * std::tan(DegToRad(north_disk_tilt_deg));
+
 #if GAZEBO_MAJOR_VERSION >= 8
-      const ignition::math::Vector3d cyclic_lateral_force_world(
-        this->cyclic_world_east_deg_ * this->cyclic_lateral_force_per_deg_n_,
-        this->cyclic_world_north_deg_ * this->cyclic_lateral_force_per_deg_n_,
+      const ignition::math::Vector3d cyclic_disk_tilt_force_world(
+        east_disk_tilt_force_n,
+        north_disk_tilt_force_n,
         0.0);
 #else
-      const gazebo::math::Vector3 cyclic_lateral_force_world(
-        this->cyclic_world_east_deg_ * this->cyclic_lateral_force_per_deg_n_,
-        this->cyclic_world_north_deg_ * this->cyclic_lateral_force_per_deg_n_,
+      const gazebo::math::Vector3 cyclic_disk_tilt_force_world(
+        east_disk_tilt_force_n,
+        north_disk_tilt_force_n,
         0.0);
 #endif
-      this->base_link_->AddForce(cyclic_lateral_force_world);
+      this->base_link_->AddForce(cyclic_disk_tilt_force_world);
     }
 
     if (px4_command_active && this->cyclic_moment_per_deg_nm_ > 0.0) {
@@ -744,18 +885,21 @@ private:
 
     if ((now - this->last_print_time_).Double() > 1.0) {
       const double rpm = RadPerSecToRpm(omega_cmd);
-      const double total_lift = blade1_lift_n + blade2_lift_n;
-      const double net_n = total_lift - payload_force_n - this->EmptyWeightNewton();
+      const double net_n = total_lift_n - payload_force_n - this->physical_payload_weight_n_
+        - this->EmptyWeightNewton();
 
       gzmsg << "[TeeterRotorPlugin] rpm = "
             << rpm
-            << ", payload = " << this->payload_weight_lb_ << " lb"
+            << ", payload = " << (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0) << " lb"
+            << ", virtual payload = " << this->payload_weight_lb_ << " lb"
             << ", azimuth = " << this->rotor_azimuth_rad_ * 180.0 / M_PI << " deg"
             << ", blade pitches = [" << blade1_pitch_cmd_deg << ", " << blade2_pitch_cmd_deg << "] deg"
             << ", cyclic = [" << this->roll_cyclic_deg_ << ", " << this->pitch_cyclic_deg_ << "] deg"
-            << ", total lift = " << total_lift << " N"
+            << ", disk tilt E/N = [" << east_disk_tilt_deg << ", " << north_disk_tilt_deg << "] deg"
+            << ", disk force E/N = [" << east_disk_tilt_force_n << ", " << north_disk_tilt_force_n << "] N"
+            << ", total lift = " << total_lift_n << " N"
             << ", net = " << net_n << " N"
-            << ", drive torque = " << this->DriveTorqueNewtonMeter() << " N*m"
+            << ", drive torque = " << this->DriveTorqueNewtonMeter(omega_cmd) << " N*m"
             << ", drag torque = " << this->DragTorqueNewtonMeter(omega_cmd) << " N*m"
             << std::endl;
 
@@ -777,7 +921,8 @@ private:
   double max_collective_cmd_deg_{12.0};
   double max_cyclic_deg_{2.0};
   double cyclic_moment_per_deg_nm_{35.0};
-  double cyclic_lateral_force_per_deg_n_{0.0};
+  double cyclic_disk_tilt_per_deg_{0.0};
+  double max_cyclic_disk_tilt_deg_{8.0};
   double px4_command_timeout_sec_{0.5};
   bool print_px4_input_debug_{true};
   double px4_input_debug_interval_sec_{0.2};
@@ -796,6 +941,7 @@ private:
   physics::ModelPtr model_;
   physics::LinkPtr base_link_;
   physics::LinkPtr rotor_link_;
+  physics::LinkPtr payload_link_;
   physics::LinkPtr blade1_indicator_link_;
   physics::LinkPtr blade2_indicator_link_;
   physics::JointPtr joint_;
@@ -803,7 +949,15 @@ private:
 
   // Primary variables.
   double target_rpm_{0.0};
-  double payload_weight_lb_{360.0};
+  double payload_weight_lb_{0.0};
+  bool payload_enabled_{true};
+  double payload_mass_lb_{360.0};
+  double disabled_payload_mass_kg_{0.5};
+  ignition::math::Vector3d payload_offset_from_cog_m_{0.0, 0.0, 0.194};
+  double payload_outer_diameter_in_{17.375};
+  double payload_inner_diameter_in_{1.0};
+  double payload_thickness_in_{10.0};
+  double payload_disabled_scale_{0.08};
   double blade1_pitch_deg_{7.27};
   double blade2_pitch_deg_{7.27};
 
@@ -833,6 +987,7 @@ private:
   double rotor_inertia_kgm2_{35.0};
   double k_torque_{0.831};
   double max_drive_torque_nm_{440.6};
+  double engine_available_power_w_{10141.5};
   double rotor_omega_{0.0};
   bool rotor_time_initialized_{false};
   common::Time last_rotor_update_time_{0};
@@ -854,6 +1009,11 @@ private:
   double zero_lift_pitch_deg_{1.0};
   double min_pitch_deg_{2.0};
   double max_pitch_deg_{12.0};
+  bool use_blade_element_lift_{false};
+  double air_density_kgm3_{1.225};
+  double blade_lift_slope_per_rad_{6.283185307179586};
+  int blade_element_sections_{12};
+  double blade_element_lift_scale_{0.0};
 
   // Metadata.
   double rotor_radius_ft_{12.0};
@@ -884,7 +1044,8 @@ private:
   double target_omega_{0.0};
   double empty_weight_kg_{19.05};
   double payload_mass_kg_{163.29};
-  double payload_weight_n_{1601.36};
+  double physical_payload_weight_n_{1601.36};
+  double payload_weight_n_{0.0};
   double current_gross_weight_lb_{402.0};
   double current_gross_weight_n_{1788.18};
 

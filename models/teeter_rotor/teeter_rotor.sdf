@@ -253,7 +253,7 @@
     </link>
 
     <link name="/imu_link">
-      <pose>0 0 0 0 0 0</pose>
+      <pose>0 0 0.694 0 0 0</pose>
       <inertial>
         <pose>0 0 0 0 0 0</pose>
         <mass>0.015</mass>
@@ -266,29 +266,27 @@
           <izz>0.00001</izz>
         </inertia>
       </inertial>
+      <visual name="flight_controller_visual">
+        <pose>0 0 0.035 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.12 0.08 0.025</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.02 0.18 0.08 1</ambient>
+          <diffuse>0.04 0.35 0.14 1</diffuse>
+          <specular>0.05 0.12 0.05 1</specular>
+        </material>
+      </visual>
     </link>
 
-    <joint name="/imu_joint" type="revolute">
+    <joint name="/imu_joint" type="fixed">
       <child>/imu_link</child>
-      <!-- PX4's stock estimator/controller assumes the IMU frame is fixed to
-           the vehicle body. Keep the simulated PX4 IMU on base_link for
-           position-hold bring-up; a rotor-mounted flight controller needs a
-           custom rotating-frame estimator/control path. -->
-      <parent>base_link</parent>
-      <axis>
-        <xyz>1 0 0</xyz>
-        <limit>
-          <lower>0</lower>
-          <upper>0</upper>
-          <effort>0</effort>
-          <velocity>0</velocity>
-        </limit>
-        <dynamics>
-          <spring_reference>0</spring_reference>
-          <spring_stiffness>0</spring_stiffness>
-        </dynamics>
-        <use_parent_model_frame>1</use_parent_model_frame>
-      </axis>
+      <!-- Rotor-hub mounted flight controller for SITL. The IMU link spins
+           with rotor_link; mavlink_interface de-rotates it back into the
+           body frame before sending data to stock PX4. -->
+      <parent>rotor_link</parent>
     </joint>
 
     <!-- ====================================================================== -->
@@ -651,11 +649,15 @@
     <!-- payload_link                                                            -->
     <!-- ====================================================================== -->
     <!--
-      Fixed 360 lb barbell plate payload.
+      Configurable barbell plate payload.
 
       The payload is centered on the system z axis and placed 0.5 m below the
       rotor_link origin. rotor_link is at z = 0.694 m, so the payload center is
       at z = 0.194 m in model/base coordinates.
+
+      The teeter_rotor_plugin overwrites this link's mass, inertia, collision
+      state, and relative pose from the payload parameters below. The inertial
+      values here are the 360 lb default fallback if the plugin is not loaded.
 
       Geometry uses the provided 17.375 in OD and 10 in stack thickness. Inertia
       assumes a standard 1 in center hole:
@@ -743,6 +745,9 @@
       <!-- rotorLinkName:
            Name of the simplified spinning rotor assembly. -->
       <rotorLinkName>rotor_link</rotorLinkName>
+      <!-- payloadLinkName:
+           Physical payload link whose mass/inertia/pose are configured below. -->
+      <payloadLinkName>payload_link</payloadLinkName>
       <blade1IndicatorLinkName>blade_1_pitch_indicator</blade1IndicatorLinkName>
       <blade2IndicatorLinkName>blade_2_pitch_indicator</blade2IndicatorLinkName>
       <!-- jointName:
@@ -757,13 +762,37 @@
       <targetRpm>0.0</targetRpm>
       <!-- payloadWeightLb:
            Legacy virtual payload weight in pounds-force.
-           Set to 0 because payload_link now provides real mass and inertia.
+           Keep this at 0 when using physical payload_link mass/inertia. -->
+      <payloadWeightLb>0.0</payloadWeightLb>
+      <!-- payloadEnabled:
+           true = fly with the physical payload_link mass.
+           false = payload_link is reduced to a stable 0.5 kg dummy mass and
+           scaled down visually/physically by payloadDisabledScale.
+           This is the main switch for with-payload / no-payload SITL runs. -->
+      <payloadEnabled>false</payloadEnabled>
+      <!-- payloadMassLb:
+           Physical payload mass in pounds-mass.
 
            Typical tests:
-             360 lb -> should lift clearly
+             0 lb   -> empty vehicle
+             360 lb -> current barbell plate payload
              398 lb -> near 440 lb design gross
              420 lb -> 10:1 payload-to-empty target, likely overloaded -->
-      <payloadWeightLb>0.0</payloadWeightLb>
+      <payloadMassLb>360.0</payloadMassLb>
+      <!-- payloadOffsetFromCogM:
+           Payload center location in model/base coordinates, measured from the
+           current system CoG frame used by the simplified model. Current value
+           places the plate 0.5 m below rotor_link origin:
+             rotor z 0.694 m - 0.5 m = payload z 0.194 m. -->
+      <payloadOffsetFromCogM>0 0 0.194</payloadOffsetFromCogM>
+      <!-- Barbell plate dimensions used to calculate annular-cylinder inertia. -->
+      <payloadOuterDiameterIn>17.375</payloadOuterDiameterIn>
+      <payloadInnerDiameterIn>1.0</payloadInnerDiameterIn>
+      <payloadThicknessIn>10.0</payloadThicknessIn>
+      <!-- payloadDisabledScale:
+           Link scale applied when payloadEnabled=false. 0.08 makes the plate
+           almost disappear while keeping a stable dummy body in the model. -->
+      <payloadDisabledScale>0.08</payloadDisabledScale>
       <!-- blade1PitchDeg:
            Pitch command for blade 1 in degrees.
            Design/reference value: 7.27 deg. -->
@@ -793,8 +822,10 @@
       <!-- collectiveDeg:
            Mean blade pitch for both blades.
            This replaces fixed blade pitch when useCyclicPitch=true.
-           Start with the design/reference value of 7.27 deg. -->
-      <collectiveDeg>7.27</collectiveDeg>
+           Current SITL gross weight is about 402 lb, so the expected hover
+           collective is about 6.73 deg with the 440 lb @ 7.27 deg design
+           lift model. PX4 actuator input overrides this fallback value. -->
+      <collectiveDeg>6.73</collectiveDeg>
 
       <!-- rollCyclicDeg:
            Cyclic pitch amplitude used to create roll control moment.
@@ -901,11 +932,16 @@
            commands. Keep this at 0 for physical cyclic-pitch-only control. -->
       <cyclicMomentPerDegNm>0.0</cyclicMomentPerDegNm>
 
-      <!-- cyclicLateralForcePerDegN:
-           Fast SITL verification assist. Applies world-frame N/E force from
-           cyclic commands so Position mode direction control can be validated
-           before relying entirely on the delayed blade-pitch response. -->
-      <cyclicLateralForcePerDegN>6.0</cyclicLateralForcePerDegN>
+      <!-- cyclicDiskTiltPerDeg:
+           Physical cyclic authority approximation. Tilt the effective rotor
+           thrust vector by this many disk degrees per commanded cyclic degree:
+
+             lateral_force = total_rotor_lift * tan(disk_tilt)
+
+           A value of 0.5 means a +/-12 deg cyclic command can create about
+           +/-6 deg of effective rotor disk tilt before the max clamp below. -->
+      <cyclicDiskTiltPerDeg>0.5</cyclicDiskTiltPerDeg>
+      <maxCyclicDiskTiltDeg>8.0</maxCyclicDiskTiltDeg>
 
       <!-- px4CommandTimeoutSec:
            If no PX4 actuator message is received for this many seconds,
@@ -942,15 +978,24 @@
            Given design value: 54 lbf each.
 
            Full throttle drive torque:
-             2 engines * 54 lbf * 3 ft = 324 ft-lb ≈ 439 N*m -->
+             2 engines * 54 lbf * 3 ft = 324 ft-lb ≈ 439 N*m
+
+           The plugin also caps drive torque by available rotor power from
+           equivalentShaftHp * propulsiveEfficiency. With 16 hp and 0.85
+           efficiency this is about 10.1 kW, or about 440 N*m at 220 rpm. -->
       <engineThrustLbEach>54.0</engineThrustLbEach>
       <!-- Step 1/2 tuning: increase rotorInertiaKgm2 for slower spool-up, decrease for faster spool-up. -->
       <!-- rotorInertiaKgm2:
            Effective rotational inertia of the rotor system.
            Larger value = slower RPM spool-up.
            Smaller value = faster RPM spool-up.
-           Replace with SolidWorks rotor inertia when available. -->
-      <rotorInertiaKgm2>35.0</rotorInertiaKgm2>
+           Estimate from the current fact sheet:
+             - blade span density: 0.3 lb/ft from 3 ft to 12 ft radius
+             - tip weight: 2.53 lb per blade at 12 ft radius
+             - two blades
+           This gives about 45 kg*m^2 before hub/engine details. Replace with
+           SolidWorks rotor inertia when available. -->
+      <rotorInertiaKgm2>45.0</rotorInertiaKgm2>
       <!-- kTorque:
            Rotor drag torque coefficient.
 
@@ -994,6 +1039,8 @@
              lift = kThrust * omega^2 * pitch_factor
 
            Current value makes about 440 lbf at 220 rpm and 7.27 deg pitch.
+           With the current physical SDF mass of about 402 lb, expected hover
+           is about 6.73 deg collective at 220 rpm.
            Unit: N/(rad/s)^2. -->
       <kThrust>3.69</kThrust>
       <!-- maxRpm:
@@ -1021,6 +1068,23 @@
            Upper blade pitch clamp. Keep this above the collective upper bound
            so cyclic authority is not clipped during lateral control. -->
       <maxPitchDeg>22.0</maxPitchDeg>
+
+      <!-- Blade-element-lite lift model:
+           Uses rotor radius, hub radius, blade chord, linear twist, air density,
+           and a simple lift slope to estimate each blade's vertical lift by
+           spanwise integration. This still omits induced inflow and drag, so
+           bladeElementLiftScale is auto-calibrated when set to 0.0:
+
+             scale = designGrossWeight / unscaled_lift_at(maxRpm, hoverPitchDeg)
+
+           Current fact sheet gives an unscaled 356.8 lbf at 220 rpm and
+           7.27 deg, so the auto scale is about 1.23 to preserve the 440 lbf
+           design condition. -->
+      <useBladeElementLift>true</useBladeElementLift>
+      <airDensityKgM3>1.225</airDensityKgM3>
+      <bladeLiftSlopePerRad>6.28318530718</bladeLiftSlopePerRad>
+      <bladeElementSections>12</bladeElementSections>
+      <bladeElementLiftScale>0.0</bladeElementLiftScale>
 
       <!-- Rotor metadata -->
       <!-- rotorRadiusFt:
@@ -1097,10 +1161,12 @@
       <torqueRequiredFtLb>325.0</torqueRequiredFtLb>
       <!-- equivalentShaftHp:
            Equivalent shaft horsepower metadata.
-           Given value: 16 hp. -->
+           Given value: 16 hp. Used with propulsiveEfficiency as the engine
+           power cap for rotor drive torque. -->
       <equivalentShaftHp>16.0</equivalentShaftHp>
       <!-- propulsiveEfficiency:
-           Design assumption metadata. -->
+           Design assumption used to convert equivalentShaftHp into available
+           rotor power. -->
       <propulsiveEfficiency>0.85</propulsiveEfficiency>
       <!-- numEngines:
            Number of GP-76 engines. -->
@@ -1164,11 +1230,10 @@
       <send_vision_estimation>0</send_vision_estimation>
       <send_odometry>1</send_odometry>
       <enable_lockstep>1</enable_lockstep>
-      <!-- Quick verification mode keeps /imu_link fixed to base_link.
-           For realistic rotor-mounted FC SITL later, move /imu_joint parent
-           to rotor_link and enable derotateImuToBaseLink so PX4 receives a
-           virtual body-frame IMU while the sensor physically spins. -->
-      <derotateImuToBaseLink>false</derotateImuToBaseLink>
+      <!-- The FC/IMU is mounted on rotor_link, while stock PX4 still expects
+           body-frame IMU data. De-rotate the rotor-frame IMU into base_link
+           before forwarding it to PX4. -->
+      <derotateImuToBaseLink>true</derotateImuToBaseLink>
       <derotateImuBaseLinkName>base_link</derotateImuBaseLinkName>
       <derotateImuSensorLinkName>/imu_link</derotateImuSensorLinkName>
       <use_tcp>1</use_tcp>
