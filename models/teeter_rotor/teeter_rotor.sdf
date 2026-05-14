@@ -12,7 +12,7 @@
         - independent blade pitch variables
         - GP-76 engine visual placeholders
         - engine torque dynamics from engines at 3 ft radius
-        - virtual payload force
+        - fixed barbell plate payload mass
         - tripod mast between base and rotor hub
         - no visible base box
         - 11 degree pre-cone on blades
@@ -355,24 +355,140 @@
         </geometry>
       </visual>
 
-      <!-- Hub / teeter beam placeholder. -->
-      <collision name="hub_beam_collision">
-        <pose>0 0 0 0 1.57079632679 0</pose>
+          <!-- ======================================================= -->
+      <!-- Central rotor hub / teeter pivot housing                 -->
+      <!-- Hub radius = 0.08, length = 0.25                         -->
+      <!-- Hub is lowered so the teeter beams connect to blade root -->
+      <!-- instead of visual pitch indicators.                      -->
+      <!-- ======================================================= -->
+      <collision name="rotor_hub_collision">
+        <pose>0 0 -0.0889 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.08</radius>
-            <length>1.8288</length>
+            <length>0.25</length>
           </cylinder>
         </geometry>
       </collision>
-      <visual name="hub_beam_visual">
-        <pose>0 0 0 0 1.57079632679 0</pose>
+
+      <visual name="rotor_hub_visual">
+        <pose>0 0 -0.0889 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.08</radius>
-            <length>1.8288</length>
+            <length>0.25</length>
           </cylinder>
         </geometry>
+        <material>
+          <ambient>0.20 0.20 0.20 1</ambient>
+          <diffuse>0.20 0.20 0.20 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Central teeter pivot marker.
+           This is the lower center point of the V shape:
+           right beam endpoint 1 =  0.0000 0 -0.1778
+           left  beam endpoint 1 =  0.0000 0 -0.1778
+      -->
+      <visual name="teeter_center_pivot_visual">
+        <pose>0 0 -0.1778 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.075</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.10 0.10 0.10 1</ambient>
+          <diffuse>0.10 0.10 0.10 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- ======================================================= -->
+      <!-- Two-part teeter beam, attached to actual blade roots     -->
+      <!--                                                         -->
+      <!-- Blade root points from the current blade visuals:        -->
+      <!--   blade 1 root: +0.9144 0 0.0000                         -->
+      <!--   blade 2 root: -0.9144 0 0.0000                         -->
+      <!--                                                         -->
+      <!-- Teeter center pivot: 0 0 -0.1778                         -->
+      <!-- This makes each beam parallel to the 11 deg blade cone.  -->
+      <!-- ======================================================= -->
+
+      <!-- Right teeter beam: center pivot -> blade_1_visual root -->
+      <collision name="teeter_beam_right_collision">
+        <pose>0.4572 0 -0.0889 0 1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <visual name="teeter_beam_right_visual">
+        <pose>0.4572 0 -0.0889 0 1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.08 0.08 0.08 1</ambient>
+          <diffuse>0.08 0.08 0.08 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Left teeter beam: center pivot -> blade_2_visual root -->
+      <collision name="teeter_beam_left_collision">
+        <pose>-0.4572 0 -0.0889 0 -1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <visual name="teeter_beam_left_visual">
+        <pose>-0.4572 0 -0.0889 0 -1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.08 0.08 0.08 1</ambient>
+          <diffuse>0.08 0.08 0.08 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Optional root clamps to make the blade connection obvious. -->
+      <visual name="blade_1_root_clamp_visual">
+        <pose>0.9144 0 0.0000 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.07</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="blade_2_root_clamp_visual">
+        <pose>-0.9144 0 0.0000 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.07</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
       </visual>
 
       <visual name="tip_weight_1_visual">
@@ -531,6 +647,76 @@
       </visual>
     </link>
 
+    <!-- ====================================================================== -->
+    <!-- payload_link                                                            -->
+    <!-- ====================================================================== -->
+    <!--
+      Fixed 360 lb barbell plate payload.
+
+      The payload is centered on the system z axis and placed 0.5 m below the
+      rotor_link origin. rotor_link is at z = 0.694 m, so the payload center is
+      at z = 0.194 m in model/base coordinates.
+
+      Geometry uses the provided 17.375 in OD and 10 in stack thickness. Inertia
+      assumes a standard 1 in center hole:
+        Izz = 1/2 m (Ro^2 + Ri^2)
+        Ixx = Iyy = 1/12 m (3 (Ro^2 + Ri^2) + t^2)
+
+      The collision is approximated as a solid cylinder; the annular hole is
+      represented in inertia, not collision geometry.
+    -->
+    <link name="payload_link">
+      <pose>0 0 0.194 0 0 0</pose>
+      <inertial>
+        <mass>163.2932532</mass>
+        <inertia>
+          <ixx>2.87226963</ixx>
+          <iyy>2.87226963</iyy>
+          <izz>3.98870134</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="payload_plate_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.2206625</radius>
+            <length>0.254</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <visual name="payload_plate_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.2206625</radius>
+            <length>0.254</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.015 0.015 0.015 1</ambient>
+          <diffuse>0.04 0.04 0.04 1</diffuse>
+          <specular>0.12 0.12 0.12 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="payload_fixed_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>payload_link</child>
+    </joint>
+
     <joint name="main_rotor_joint" type="revolute">
       <parent>base_link</parent>
       <child>rotor_link</child>
@@ -570,15 +756,14 @@
            Unit: rpm. -->
       <targetRpm>0.0</targetRpm>
       <!-- payloadWeightLb:
-           Virtual payload weight in pounds-force.
-           Applied as a downward force by the plugin.
-           It does not yet change inertia or center of gravity.
+           Legacy virtual payload weight in pounds-force.
+           Set to 0 because payload_link now provides real mass and inertia.
 
            Typical tests:
              360 lb -> should lift clearly
              398 lb -> near 440 lb design gross
              420 lb -> 10:1 payload-to-empty target, likely overloaded -->
-      <payloadWeightLb>360.0</payloadWeightLb>
+      <payloadWeightLb>0.0</payloadWeightLb>
       <!-- blade1PitchDeg:
            Pitch command for blade 1 in degrees.
            Design/reference value: 7.27 deg. -->
