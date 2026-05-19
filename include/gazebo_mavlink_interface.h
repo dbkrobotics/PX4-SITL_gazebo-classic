@@ -155,6 +155,8 @@ private:
   std::string motor_velocity_reference_pub_topic_{kDefaultMotorVelocityReferencePubTopic};
   std::string mavlink_control_sub_topic_;
   std::string link_name_;
+  std::string derotate_imu_base_link_name_{"base_link"};
+  std::string derotate_imu_sensor_link_name_{"/imu_link"};
 
   transport::NodePtr node_handle_;
   transport::PublisherPtr motor_velocity_reference_pub_;
@@ -162,9 +164,12 @@ private:
 
   physics::ModelPtr model_{};
   physics::WorldPtr world_{nullptr};
+  physics::LinkPtr derotate_imu_base_link_{nullptr};
+  physics::LinkPtr derotate_imu_sensor_link_{nullptr};
 
   bool send_vision_estimation_{false};
   bool send_odometry_{false};
+  bool derotate_imu_to_base_link_{false};
 
   std::vector<physics::JointPtr> joints_;
   std::vector<common::PID> pids_;

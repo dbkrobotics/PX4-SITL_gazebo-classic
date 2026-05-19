@@ -1,0 +1,1291 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="teeter_rotor">
+    <!-- ====================================================================== -->
+    <!-- DOCUMENTATION HEADER                                                    -->
+    <!-- ====================================================================== -->
+    <!--
+      Teeter Rotor PX4 v1.13 Gazebo Classic model.
+
+      Current model features:
+        - two large rotor blades
+        - independent blade pitch variables
+        - GP-76 engine visual placeholders
+        - engine torque dynamics from engines at 3 ft radius
+        - fixed barbell plate payload mass
+        - tripod mast between base and rotor hub
+        - no visible base box
+        - 11 degree pre-cone on blades
+        - visual-only blade pitch indicators
+
+      This is an intermediate engineering model.
+      It is intended for simulation architecture, design iteration, and PX4
+      integration work. It is not yet a full blade-element aerodynamic model.
+    -->
+    <pose>0 0 0 0 0 0</pose>
+    <static>false</static>
+
+    <!-- ====================================================================== -->
+    <!-- base_link                                                              -->
+    <!-- ====================================================================== -->
+    <!--
+      Non-rotating vehicle body reference.
+
+      The visible base box has been removed to better match the actual design.
+      This link still keeps inertial properties because Gazebo needs physical
+      mass and inertia for the vehicle body.
+
+      The tripod mast visuals are attached to this base_link.
+    -->
+    <link name="base_link">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>11.05</mass>
+        <inertia>
+          <ixx>8.0</ixx>
+          <iyy>8.0</iyy>
+          <izz>12.0</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+
+      <!-- ======================================================= -->
+      <!-- Tripod mast between base_link and rotor hub              -->
+      <!-- This is fixed to base_link and visually supports rotor   -->
+      <!-- area. It does not physically attach to spinning rotor_link. -->
+      <!-- ======================================================= -->
+      <collision name="tripod_mast_front_left_collision">
+        <pose>0.2250 0.1600 -0.1600 0.000000 0.390870 -2.523448</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.4493</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <collision name="tripod_mast_front_right_collision">
+        <pose>0.2250 -0.1600 -0.1600 0.000000 0.390870 2.523448</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.4493</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <collision name="tripod_mast_rear_collision">
+        <pose>-0.2400 0.0000 -0.1600 0.000000 0.343969 0.000000</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.4234</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <visual name="tripod_mast_front_left_visual">
+        <pose>0.2250 0.1600 -0.1600 0.000000 0.390870 -2.523448</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.4493</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="tripod_mast_front_right_visual">
+        <pose>0.2250 -0.1600 -0.1600 0.000000 0.390870 2.523448</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.4493</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="tripod_mast_rear_visual">
+        <pose>-0.2400 0.0000 -0.1600 0.000000 0.343969 0.000000</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.0250</radius>
+            <length>1.4234</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="tripod_mast_top_joint_visual">
+        <pose>0.0000 0.0000 0.5500 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.075</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.18 0.18 0.18 1</ambient>
+          <diffuse>0.18 0.18 0.18 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="tripod_mast_top_plate_visual">
+        <pose>0 0 0.51 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.18</radius>
+            <length>0.035</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.16 0.16 0.16 1</ambient>
+          <diffuse>0.16 0.16 0.16 1</diffuse>
+        </material>
+      </visual>
+
+
+      <!-- ================================================================== -->
+      <!-- PX4 SITL sensor: IMU                                                -->
+      <!-- ================================================================== -->
+      <!--
+        This sensor/plugin publishes IMU data for PX4 through the Gazebo
+        mavlink_interface. The topic is /imu, matching imuSubTopic below.
+      -->
+      <sensor name="imu_sensor" type="imu">
+        <always_on>true</always_on>
+        <update_rate>250</update_rate>
+        <visualize>false</visualize>
+        <imu>
+          <angular_velocity>
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0003394</stddev>
+                <bias_mean>0.0</bias_mean>
+                <bias_stddev>3.8785e-05</bias_stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0003394</stddev>
+                <bias_mean>0.0</bias_mean>
+                <bias_stddev>3.8785e-05</bias_stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0003394</stddev>
+                <bias_mean>0.0</bias_mean>
+                <bias_stddev>3.8785e-05</bias_stddev>
+              </noise>
+            </z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.004</stddev>
+                <bias_mean>0.0</bias_mean>
+                <bias_stddev>0.006</bias_stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.004</stddev>
+                <bias_mean>0.0</bias_mean>
+                <bias_stddev>0.006</bias_stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.004</stddev>
+                <bias_mean>0.0</bias_mean>
+                <bias_stddev>0.006</bias_stddev>
+              </noise>
+            </z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+
+    </link>
+
+    <link name="/imu_link">
+      <pose>0 0 0.694 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.015</mass>
+        <inertia>
+          <ixx>0.00001</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00001</iyy>
+          <iyz>0</iyz>
+          <izz>0.00001</izz>
+        </inertia>
+      </inertial>
+      <visual name="flight_controller_visual">
+        <pose>0 0 0.035 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.12 0.08 0.025</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.02 0.18 0.08 1</ambient>
+          <diffuse>0.04 0.35 0.14 1</diffuse>
+          <specular>0.05 0.12 0.05 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="/imu_joint" type="fixed">
+      <child>/imu_link</child>
+      <!-- Rotor-hub mounted flight controller for SITL. The IMU link spins
+           with rotor_link; mavlink_interface de-rotates it back into the
+           body frame before sending data to stock PX4. -->
+      <parent>rotor_link</parent>
+    </joint>
+
+    <!-- ====================================================================== -->
+    <!-- rotor_link                                                              -->
+    <!-- ====================================================================== -->
+    <!--
+      Simplified spinning rotor assembly.
+
+      Contains:
+        - two large blade visuals/collisions
+        - hub / teeter beam placeholder
+        - tip weights
+        - GP-76 engine visual placeholders
+
+      The rotor is still represented as one simplified spinning rigid link.
+      A true teeter hinge / flapping model is future work.
+    -->
+    <link name="rotor_link">
+      <pose>0 0 0.694 0 0 0</pose>
+      <inertial>
+        <mass>8.0</mass>
+        <inertia>
+          <ixx>18.0</ixx>
+          <iyy>18.0</iyy>
+          <izz>35.0</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+
+      <!-- Two-blade physical/simple rotor visual and collision. -->
+      <collision name="blade_1_collision">
+        <pose>2.2608 0 0.2617 0 -0.191986 0</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="blade_1_visual">
+        <pose>2.2608 0 0.2617 0 -0.191986 0</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </visual>
+
+      <collision name="blade_2_collision">
+        <pose>-2.2608 0 0.2617 0 -0.191986 3.14159265359</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="blade_2_visual">
+        <pose>-2.2608 0 0.2617 0 -0.191986 3.14159265359</pose>
+        <geometry>
+          <box>
+            <size>2.7432 0.2667 0.035</size>
+          </box>
+        </geometry>
+      </visual>
+
+          <!-- ======================================================= -->
+      <!-- Central rotor hub / teeter pivot housing                 -->
+      <!-- Hub radius = 0.08, length = 0.25                         -->
+      <!-- Hub is lowered so the teeter beams connect to blade root -->
+      <!-- instead of visual pitch indicators.                      -->
+      <!-- ======================================================= -->
+      <collision name="rotor_hub_collision">
+        <pose>0 0 -0.0889 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.08</radius>
+            <length>0.25</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <visual name="rotor_hub_visual">
+        <pose>0 0 -0.0889 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.08</radius>
+            <length>0.25</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.20 0.20 0.20 1</ambient>
+          <diffuse>0.20 0.20 0.20 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Central teeter pivot marker.
+           This is the lower center point of the V shape:
+           right beam endpoint 1 =  0.0000 0 -0.1778
+           left  beam endpoint 1 =  0.0000 0 -0.1778
+      -->
+      <visual name="teeter_center_pivot_visual">
+        <pose>0 0 -0.1778 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.075</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.10 0.10 0.10 1</ambient>
+          <diffuse>0.10 0.10 0.10 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- ======================================================= -->
+      <!-- Two-part teeter beam, attached to actual blade roots     -->
+      <!--                                                         -->
+      <!-- Blade root points from the current blade visuals:        -->
+      <!--   blade 1 root: +0.9144 0 0.0000                         -->
+      <!--   blade 2 root: -0.9144 0 0.0000                         -->
+      <!--                                                         -->
+      <!-- Teeter center pivot: 0 0 -0.1778                         -->
+      <!-- This makes each beam parallel to the 11 deg blade cone.  -->
+      <!-- ======================================================= -->
+
+      <!-- Right teeter beam: center pivot -> blade_1_visual root -->
+      <collision name="teeter_beam_right_collision">
+        <pose>0.4572 0 -0.0889 0 1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <visual name="teeter_beam_right_visual">
+        <pose>0.4572 0 -0.0889 0 1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.08 0.08 0.08 1</ambient>
+          <diffuse>0.08 0.08 0.08 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Left teeter beam: center pivot -> blade_2_visual root -->
+      <collision name="teeter_beam_left_collision">
+        <pose>-0.4572 0 -0.0889 0 -1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <visual name="teeter_beam_left_visual">
+        <pose>-0.4572 0 -0.0889 0 -1.37881010908 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.9316</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.08 0.08 0.08 1</ambient>
+          <diffuse>0.08 0.08 0.08 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Optional root clamps to make the blade connection obvious. -->
+      <visual name="blade_1_root_clamp_visual">
+        <pose>0.9144 0 0.0000 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.07</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="blade_2_root_clamp_visual">
+        <pose>-0.9144 0 0.0000 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.07</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="tip_weight_1_visual">
+        <pose>3.6072 0 0.5234 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.08</radius>
+          </sphere>
+        </geometry>
+      </visual>
+      <visual name="tip_weight_2_visual">
+        <pose>-3.6072 0 0.5234 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.08</radius>
+          </sphere>
+        </geometry>
+      </visual>
+
+      <!-- Visible GP-76 engine placeholders at 3 ft radius.
+           Engine 1 is at +X, offset +Y; Engine 2 is at -X, offset -Y.
+           These are visual placeholders; drive torque is calculated in plugin. -->
+      <visual name="gp76_engine_1_body_visual">
+        <pose>0.9144 0.18 0.03 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.32 0.22 0.20</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_1_cylinder_visual">
+        <pose>0.9144 0.18 0.20 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.10</radius>
+            <length>0.18</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.55 0.55 0.55 1</ambient>
+          <diffuse>0.55 0.55 0.55 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_1_prop_disc_visual">
+        <pose>0.9144 0.42 0.03 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.22</radius>
+            <length>0.015</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.9 0.45</ambient>
+          <diffuse>0.1 0.1 0.9 0.45</diffuse>
+        </material>
+      </visual>
+
+      <visual name="gp76_engine_2_body_visual">
+        <pose>-0.9144 -0.18 0.03 0 0 3.14159265359</pose>
+        <geometry>
+          <box>
+            <size>0.32 0.22 0.20</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.12 0.12 0.12 1</ambient>
+          <diffuse>0.12 0.12 0.12 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_2_cylinder_visual">
+        <pose>-0.9144 -0.18 0.20 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.10</radius>
+            <length>0.18</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.55 0.55 0.55 1</ambient>
+          <diffuse>0.55 0.55 0.55 1</diffuse>
+        </material>
+      </visual>
+      <visual name="gp76_engine_2_prop_disc_visual">
+        <pose>-0.9144 -0.42 0.03 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.22</radius>
+            <length>0.015</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.9 0.45</ambient>
+          <diffuse>0.1 0.1 0.9 0.45</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <!-- Visual-only pitch indicators. -->
+    <link name="blade_1_pitch_indicator">
+      <pose>0 0 1.17 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <iyy>0.000001</iyy>
+          <izz>0.000001</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="blade_1_pitch_indicator_visual">
+        <geometry>
+          <box>
+            <size>2.7432 0.36 0.025</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0 0.9 0 1</ambient>
+          <diffuse>0 0.9 0 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <link name="blade_2_pitch_indicator">
+      <pose>0 0 1.17 0 0 0</pose>
+      <gravity>false</gravity>
+      <self_collide>false</self_collide>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>0.000001</ixx>
+          <iyy>0.000001</iyy>
+          <izz>0.000001</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="blade_2_pitch_indicator_visual">
+        <geometry>
+          <box>
+            <size>2.7432 0.36 0.025</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.9 0 0 1</ambient>
+          <diffuse>0.9 0 0 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <!-- ====================================================================== -->
+    <!-- payload_link                                                            -->
+    <!-- ====================================================================== -->
+    <!--
+      Configurable barbell plate payload.
+
+      The payload is centered on the system z axis and placed 0.5 m below the
+      rotor_link origin. rotor_link is at z = 0.694 m, so the payload center is
+      at z = 0.194 m in model/base coordinates.
+
+      The teeter_rotor_plugin overwrites this link's mass, inertia, collision
+      state, and relative pose from the payload parameters below. The inertial
+      values here are the 360 lb default fallback if the plugin is not loaded.
+
+      Geometry uses the provided 17.375 in OD and 10 in stack thickness. Inertia
+      assumes a standard 1 in center hole:
+        Izz = 1/2 m (Ro^2 + Ri^2)
+        Ixx = Iyy = 1/12 m (3 (Ro^2 + Ri^2) + t^2)
+
+      The collision is approximated as a solid cylinder; the annular hole is
+      represented in inertia, not collision geometry.
+    -->
+    <link name="payload_link">
+      <pose>0 0 0.194 0 0 0</pose>
+      <inertial>
+        <mass>163.2932532</mass>
+        <inertia>
+          <ixx>2.87226963</ixx>
+          <iyy>2.87226963</iyy>
+          <izz>3.98870134</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="payload_plate_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.2206625</radius>
+            <length>0.254</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <visual name="payload_plate_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.2206625</radius>
+            <length>0.254</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.015 0.015 0.015 1</ambient>
+          <diffuse>0.04 0.04 0.04 1</diffuse>
+          <specular>0.12 0.12 0.12 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="payload_fixed_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>payload_link</child>
+    </joint>
+
+    <joint name="main_rotor_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_link</child>
+      <pose>0 0 0.694 0 0 0</pose>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+          <effort>10000</effort>
+          <velocity>1000</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.01</damping>
+          <friction>0.0</friction>
+        </dynamics>
+      </axis>
+    </joint>
+
+    <plugin name="teeter_rotor_plugin" filename="libteeter_rotor_plugin.so">
+      <!-- baseLinkName:
+           Name of the non-rotating vehicle body link. -->
+      <baseLinkName>base_link</baseLinkName>
+      <!-- rotorLinkName:
+           Name of the simplified spinning rotor assembly. -->
+      <rotorLinkName>rotor_link</rotorLinkName>
+      <!-- payloadLinkName:
+           Physical payload link whose mass/inertia/pose are configured below. -->
+      <payloadLinkName>payload_link</payloadLinkName>
+      <blade1IndicatorLinkName>blade_1_pitch_indicator</blade1IndicatorLinkName>
+      <blade2IndicatorLinkName>blade_2_pitch_indicator</blade2IndicatorLinkName>
+      <!-- jointName:
+           Revolute joint connecting base_link and rotor_link. -->
+      <jointName>main_rotor_joint</jointName>
+
+      <!-- Primary test variables -->
+      <!-- targetRpm:
+           If useEngineDynamics=false, this directly forces rotor RPM.
+           If useEngineDynamics=true, this is only the initial RPM at spawn.
+           Unit: rpm. -->
+      <targetRpm>0.0</targetRpm>
+      <!-- payloadWeightLb:
+           Legacy virtual payload weight in pounds-force.
+           Keep this at 0 when using physical payload_link mass/inertia. -->
+      <payloadWeightLb>0.0</payloadWeightLb>
+      <!-- payloadEnabled:
+           true = fly with the physical payload_link mass.
+           false = payload_link is reduced to a stable 0.5 kg dummy mass and
+           scaled down visually/physically by payloadDisabledScale.
+           This is the main switch for with-payload / no-payload SITL runs. -->
+      <payloadEnabled>false</payloadEnabled>
+      <!-- payloadMassLb:
+           Physical payload mass in pounds-mass.
+
+           Typical tests:
+             0 lb   -> empty vehicle
+             360 lb -> current barbell plate payload
+             398 lb -> near 440 lb design gross
+             420 lb -> 10:1 payload-to-empty target, likely overloaded -->
+      <payloadMassLb>360.0</payloadMassLb>
+      <!-- payloadOffsetFromCogM:
+           Payload center location in model/base coordinates, measured from the
+           current system CoG frame used by the simplified model. Current value
+           places the plate 0.5 m below rotor_link origin:
+             rotor z 0.694 m - 0.5 m = payload z 0.194 m. -->
+      <payloadOffsetFromCogM>0 0 0.194</payloadOffsetFromCogM>
+      <!-- Barbell plate dimensions used to calculate annular-cylinder inertia. -->
+      <payloadOuterDiameterIn>17.375</payloadOuterDiameterIn>
+      <payloadInnerDiameterIn>1.0</payloadInnerDiameterIn>
+      <payloadThicknessIn>10.0</payloadThicknessIn>
+      <!-- payloadDisabledScale:
+           Link scale applied when payloadEnabled=false. 0.08 makes the plate
+           almost disappear while keeping a stable dummy body in the model. -->
+      <payloadDisabledScale>0.08</payloadDisabledScale>
+      <!-- blade1PitchDeg:
+           Pitch command for blade 1 in degrees.
+           Design/reference value: 7.27 deg. -->
+      <blade1PitchDeg>7.27</blade1PitchDeg>
+      <!-- blade2PitchDeg:
+           Pitch command for blade 2 in degrees.
+           Equal blade1/blade2 pitch gives mostly symmetric lift.
+           Different fixed pitch creates rotating imbalance, not true cyclic control. -->
+      <blade2PitchDeg>7.27</blade2PitchDeg>
+
+      <!-- ================================================================== -->
+      <!-- Azimuth-based cyclic pitch                                          -->
+      <!-- ================================================================== -->
+      <!-- useCyclicPitch:
+           false = use fixed blade1PitchDeg and blade2PitchDeg.
+           true  = compute blade pitch from rotor azimuth every update.
+
+           Cyclic pitch formula:
+             blade_pitch = collectiveDeg
+                         + rollCyclicDeg  * cos(azimuth + cyclicPhaseOffsetDeg)
+                         + pitchCyclicDeg * sin(azimuth + cyclicPhaseOffsetDeg)
+
+           Blade 2 is evaluated 180 degrees away from blade 1.
+      -->
+      <useCyclicPitch>true</useCyclicPitch>
+
+      <!-- collectiveDeg:
+           Mean blade pitch for both blades.
+           This replaces fixed blade pitch when useCyclicPitch=true.
+           Current SITL gross weight is about 402 lb, so the expected hover
+           collective is about 6.73 deg with the 440 lb @ 7.27 deg design
+           lift model. PX4 actuator input overrides this fallback value. -->
+      <collectiveDeg>6.73</collectiveDeg>
+
+      <!-- rollCyclicDeg:
+           Cyclic pitch amplitude used to create roll control moment.
+           Start very small: 0.0 to 1.0 deg.
+           Sign/phase may need tuning after observing Gazebo response. -->
+      <rollCyclicDeg>0.0</rollCyclicDeg>
+
+      <!-- pitchCyclicDeg:
+           Cyclic pitch amplitude used to create pitch control moment.
+           Start very small: 0.0 to 1.0 deg.
+           Sign/phase may need tuning after observing Gazebo response. -->
+      <pitchCyclicDeg>0.0</pitchCyclicDeg>
+
+      <!-- cyclicPhaseOffsetDeg:
+           Phase tuning knob.
+           Helicopter/rotor systems often need phase correction.
+           Start at 0 deg, then tune sign and phase after observing response. -->
+      <cyclicPhaseOffsetDeg>0.0</cyclicPhaseOffsetDeg>
+
+      <!-- Fast cyclic bring-up knobs.
+           Use these to verify compass/GPS-frame N/E/S/W response without
+           recompiling the plugin:
+             cyclicCommandFrame=world: treat cyclic channels as world XY and
+               rotate them into the current body frame before blade phasing.
+             cyclicCommandFrame=body: treat cyclic channels as body-frame.
+             swapCyclicInputs: exchange PX4 roll and pitch cyclic channels.
+             rollCyclicSign / pitchCyclicSign: set to -1.0 to invert one axis.
+           Leave these at default first, then tune only if Gazebo motion is
+           90 deg rotated, mirrored, or diagonal-biased. -->
+      <cyclicCommandFrame>world</cyclicCommandFrame>
+      <swapCyclicInputs>false</swapCyclicInputs>
+      <rollCyclicSign>1.0</rollCyclicSign>
+      <pitchCyclicSign>1.0</pitchCyclicSign>
+
+      <!-- ================================================================== -->
+      <!-- PX4 actuator bridge                                                 -->
+      <!-- ================================================================== -->
+      <!-- enablePx4ActuatorInput:
+           true  = subscribe to PX4/Gazebo motor speed command topic.
+           false = use only SDF/manual values.
+
+           This is the first PX4 integration step.
+      -->
+      <enablePx4ActuatorInput>true</enablePx4ActuatorInput>
+
+      <!-- px4ActuatorTopic:
+           Gazebo transport topic published by PX4 SITL mavlink_interface.
+
+           In many PX4 v1.13 Gazebo Classic setups, this topic is:
+             ~/command/motor_speed
+
+           The plugin subscribes using Gazebo transport.
+      -->
+      <px4ActuatorTopic>~/teeter_rotor/gazebo/command/motor_speed</px4ActuatorTopic>
+
+      <!-- px4InputMode:
+           motor_speed = subscribe to mav_msgs::msgs::CommandMotorSpeed.
+
+           Mapping used in this first bridge:
+             actuator[0] -> engineThrottle
+             actuator[1] -> collectiveDeg
+             actuator[2] -> rollCyclicDeg
+             actuator[3] -> pitchCyclicDeg
+      -->
+      <px4InputMode>motor_speed</px4InputMode>
+
+      <!-- px4MotorSpeedScale:
+           Normalization divisor for motor_speed values.
+
+           PX4 motor speed outputs in Gazebo are often not pure 0..1.
+           For initial testing, this bridge normalizes each actuator as:
+             normalized = clamp(motor_speed / px4MotorSpeedScale, 0, 1)
+
+           If PX4 outputs are already 0..1, set this to 1.0.
+           If PX4 outputs are around 0..1000, use 1000.
+           If outputs are rad/s-like, tune this value. -->
+      <px4MotorSpeedScale>1000.0</px4MotorSpeedScale>
+
+      <!-- Throttle / collective raw mapping:
+           PX4's SITL motor outputs are servo-like here: disarmed is 0, armed
+           low stick is near 500, full command is near 1000. Treat 500 as
+           zero engine/collective command so arming does not spin up the rotor. -->
+      <px4ThrottleZeroRaw>500.0</px4ThrottleZeroRaw>
+      <px4ThrottleFullRaw>1000.0</px4ThrottleFullRaw>
+      <px4CollectiveZeroRaw>500.0</px4CollectiveZeroRaw>
+      <px4CollectiveFullRaw>1000.0</px4CollectiveFullRaw>
+
+      <!-- Collective mapping:
+           normalized actuator[1] = 0 -> minCollectiveCmdDeg
+           normalized actuator[1] = 1 -> maxCollectiveCmdDeg -->
+      <minCollectiveCmdDeg>2.0</minCollectiveCmdDeg>
+      <maxCollectiveCmdDeg>12.0</maxCollectiveCmdDeg>
+
+      <!-- Cyclic mapping:
+           actuator[2], actuator[3] are mapped from 0..1 to -maxCyclicDeg..+maxCyclicDeg.
+           Example:
+             normalized 0.5 -> 0 deg cyclic
+             normalized 1.0 -> +maxCyclicDeg
+             normalized 0.0 -> -maxCyclicDeg -->
+      <maxCyclicDeg>12.0</maxCyclicDeg>
+
+      <!-- cyclicMomentPerDegNm:
+           Optional bring-up assist moment applied to base_link from PX4 cyclic
+           commands. Keep this at 0 for physical cyclic-pitch-only control. -->
+      <cyclicMomentPerDegNm>0.0</cyclicMomentPerDegNm>
+
+      <!-- cyclicDiskTiltPerDeg:
+           Physical cyclic authority approximation. Tilt the effective rotor
+           thrust vector by this many disk degrees per commanded cyclic degree:
+
+             lateral_force = total_rotor_lift * tan(disk_tilt)
+
+           A value of 0.5 means a +/-12 deg cyclic command can create about
+           +/-6 deg of effective rotor disk tilt before the max clamp below. -->
+      <cyclicDiskTiltPerDeg>0.5</cyclicDiskTiltPerDeg>
+      <maxCyclicDiskTiltDeg>8.0</maxCyclicDiskTiltDeg>
+
+      <!-- px4CommandTimeoutSec:
+           If no PX4 actuator message is received for this many seconds,
+           plugin falls back to SDF/manual command values. -->
+      <px4CommandTimeoutSec>0.5</px4CommandTimeoutSec>
+
+      <!-- PX4 input debug:
+           Prints raw motor_speed, normalized values, and mapped command values
+           to the Gazebo terminal so QGC stick inputs can be inspected live. -->
+      <printPx4InputDebug>true</printPx4InputDebug>
+      <px4InputDebugIntervalSec>0.2</px4InputDebugIntervalSec>
+
+      <!-- Engine dynamics -->
+      <!-- useEngineDynamics:
+           true  = compute rotor RPM from engine torque and drag torque.
+           false = force rotor RPM using targetRpm.
+
+           Use false for debugging lift at a known RPM.
+           Use true for spin-up and engine behavior tests. -->
+      <useEngineDynamics>true</useEngineDynamics>
+      <!-- engineThrottle:
+           Normalized throttle for both GP-76 engines.
+           Range: 0.0 to 1.0.
+           With PX4 actuator input enabled this is only a manual fallback.
+           Keep it at zero so the rotor stays stopped until PX4 commands arrive. -->
+      <engineThrottle>0.0</engineThrottle>
+      <!-- engineRadiusFt:
+           Distance from rotor center to each engine thrust line.
+           Given design value: 3 ft.
+           This is the torque arm for engine thrust. -->
+      <engineRadiusFt>3.0</engineRadiusFt>
+      <!-- engineThrustLbEach:
+           Maximum thrust from each GP-76 engine/prop unit.
+           Given design value: 54 lbf each.
+
+           Full throttle drive torque:
+             2 engines * 54 lbf * 3 ft = 324 ft-lb ≈ 439 N*m
+
+           The plugin also caps drive torque by available rotor power from
+           equivalentShaftHp * propulsiveEfficiency. With 16 hp and 0.85
+           efficiency this is about 10.1 kW, or about 440 N*m at 220 rpm. -->
+      <engineThrustLbEach>54.0</engineThrustLbEach>
+      <!-- Step 1/2 tuning: increase rotorInertiaKgm2 for slower spool-up, decrease for faster spool-up. -->
+      <!-- rotorInertiaKgm2:
+           Effective rotational inertia of the rotor system.
+           Larger value = slower RPM spool-up.
+           Smaller value = faster RPM spool-up.
+           Estimate from the current fact sheet:
+             - blade span density: 0.3 lb/ft from 3 ft to 12 ft radius
+             - tip weight: 2.53 lb per blade at 12 ft radius
+             - two blades
+           This gives about 45 kg*m^2 before hub/engine details. Replace with
+           SolidWorks rotor inertia when available. -->
+      <rotorInertiaKgm2>45.0</rotorInertiaKgm2>
+      <!-- kTorque:
+           Rotor drag torque coefficient.
+
+           Model:
+             drag_torque = kTorque * omega^2
+
+           Derived from:
+             325 ft-lb = 440.6 N*m
+             220 rpm = 23.038 rad/s
+             kTorque = 440.6 / 23.038^2 ≈ 0.831 -->
+      <kTorque>0.831</kTorque>
+
+      <!-- Visual-only pitch indicators -->
+      <!-- showPitchIndicators:
+           Enables green/red visual-only blade pitch plates. -->
+      <showPitchIndicators>true</showPitchIndicators>
+      <!-- animatePitchIndicators:
+           If true, visual pitch indicators oscillate so pitch motion is easy to see.
+           This is visual-only and does not change lift calculation. -->
+      <animatePitchIndicators>false</animatePitchIndicators>
+      <!-- pitchIndicatorAnimationAmplitudeDeg:
+           Visual-only pitch animation amplitude in degrees. -->
+      <pitchIndicatorAnimationAmplitudeDeg>5.0</pitchIndicatorAnimationAmplitudeDeg>
+      <!-- pitchIndicatorAnimationFrequencyHz:
+           Visual-only pitch animation frequency in Hz. -->
+      <pitchIndicatorAnimationFrequencyHz>0.25</pitchIndicatorAnimationFrequencyHz>
+      <!-- pitchIndicatorVerticalOffsetM:
+           Raises the pitch indicators above the blades for visibility. -->
+      <pitchIndicatorVerticalOffsetM>0.18</pitchIndicatorVerticalOffsetM>
+
+      <!-- Fixed constants -->
+      <!-- emptyWeightLb:
+           Target empty vehicle weight.
+           Given design value: 42 lb.
+           Current SDF inertial masses approximate this empty weight. -->
+      <emptyWeightLb>42.0</emptyWeightLb>
+      <!-- kThrust:
+           Equivalent rotor lift coefficient.
+
+           Model:
+             lift = kThrust * omega^2 * pitch_factor
+
+           Current value makes about 440 lbf at 220 rpm and 7.27 deg pitch.
+           With the current physical SDF mass of about 402 lb, expected hover
+           is about 6.73 deg collective at 220 rpm.
+           Unit: N/(rad/s)^2. -->
+      <kThrust>3.69</kThrust>
+      <!-- maxRpm:
+           Maximum rotor RPM.
+           Given design value: 220 rpm.
+           Engine dynamics clamp rotor speed to this value. -->
+      <maxRpm>220.0</maxRpm>
+
+      <!-- Pitch model -->
+      <!-- hoverPitchDeg:
+           Reference pitch where pitch_factor = 1.0.
+           Given design condition: 440 lb at 7.27 deg. -->
+      <hoverPitchDeg>7.27</hoverPitchDeg>
+      <!-- zeroLiftPitchDeg:
+           Simple linear model zero-lift reference pitch.
+           Tuning parameter, not exact airfoil zero-lift angle. -->
+      <zeroLiftPitchDeg>1.0</zeroLiftPitchDeg>
+      <!-- minPitchDeg:
+           Lower blade pitch clamp. This must be wider than the collective
+           range because cyclic is added around collective. With collective
+           near 9 deg and +/-12 deg cyclic, blade pitch can briefly go below
+           zero on one side of the disk. -->
+      <minPitchDeg>-4.0</minPitchDeg>
+      <!-- maxPitchDeg:
+           Upper blade pitch clamp. Keep this above the collective upper bound
+           so cyclic authority is not clipped during lateral control. -->
+      <maxPitchDeg>22.0</maxPitchDeg>
+
+      <!-- Blade-element-lite lift model:
+           Uses rotor radius, hub radius, blade chord, linear twist, air density,
+           and a simple lift slope to estimate each blade's vertical lift by
+           spanwise integration. This still omits induced inflow and drag, so
+           bladeElementLiftScale is auto-calibrated when set to 0.0:
+
+             scale = designGrossWeight / unscaled_lift_at(maxRpm, hoverPitchDeg)
+
+           Current fact sheet gives an unscaled 356.8 lbf at 220 rpm and
+           7.27 deg, so the auto scale is about 1.23 to preserve the 440 lbf
+           design condition. -->
+      <useBladeElementLift>true</useBladeElementLift>
+      <airDensityKgM3>1.225</airDensityKgM3>
+      <bladeLiftSlopePerRad>6.28318530718</bladeLiftSlopePerRad>
+      <bladeElementSections>12</bladeElementSections>
+      <bladeElementLiftScale>0.0</bladeElementLiftScale>
+
+      <!-- Rotor metadata -->
+      <!-- rotorRadiusFt:
+           Rotor radius from center to blade tip.
+           Given value: 12 ft. -->
+      <rotorRadiusFt>12.0</rotorRadiusFt>
+      <!-- hubRadiusFt:
+           Hub radius / blade start radius.
+           Also matches engine radial location in this simplified layout.
+           Given value: 3 ft. -->
+      <hubRadiusFt>3.0</hubRadiusFt>
+      <!-- numBlades:
+           Number of large rotor blades. -->
+      <numBlades>2</numBlades>
+      <!-- bladeChordIn:
+           Blade chord.
+           Given value: 10.5 inches. -->
+      <bladeChordIn>10.5</bladeChordIn>
+      <!-- airfoil:
+           Airfoil metadata.
+           Not used yet in current equivalent lift model.
+           Future blade-element model should use this. -->
+      <airfoil>NACA23015</airfoil>
+      <!-- tipSpeedFps:
+           Tip speed at 220 rpm.
+           Given value: 276 ft/s. -->
+      <tipSpeedFps>276.0</tipSpeedFps>
+      <!-- designGrossWeightLb:
+           Design gross weight at 7.27 deg collective.
+           Given value: 440 lb. -->
+      <designGrossWeightLb>440.0</designGrossWeightLb>
+      <!-- tipWeightLb:
+           Tip weight per blade.
+           Given value: 2.53 lb. -->
+      <tipWeightLb>2.53</tipWeightLb>
+      <!-- bladeSpanwiseDensityLbFt:
+           Approximate blade spanwise density.
+           Given value: about 0.3 lb/ft. -->
+      <bladeSpanwiseDensityLbFt>0.3</bladeSpanwiseDensityLbFt>
+      <!-- forwardSpeedMph:
+           Design forward speed metadata.
+           Not used yet in current force model. -->
+      <forwardSpeedMph>20.0</forwardSpeedMph>
+      <!-- rotorTwistDeg:
+           Blade twist metadata.
+           Given value: 6 deg linear twist.
+           Future blade-element model should use this. -->
+      <rotorTwistDeg>6.0</rotorTwistDeg>
+      <!-- rotorPlaneHeightFt:
+           Rotor plane height above ground.
+           Given value: 5 ft = 1.524 m. -->
+      <rotorPlaneHeightFt>5.0</rotorPlaneHeightFt>
+      <!-- teeterAngleLimitDeg:
+           Teeter hinge range metadata.
+           Given value: +/- 15 deg.
+           True teeter hinge is not implemented yet. -->
+      <teeterAngleLimitDeg>15.0</teeterAngleLimitDeg>
+      <!-- preConeAngleDeg:
+           Blade pre-cone angle.
+           Given value: about 11 deg.
+
+           Implemented:
+             blade visual/collision tilted upward
+             tip weights raised
+             blade force application points include pre-cone offset -->
+      <preConeAngleDeg>11.0</preConeAngleDeg>
+      <!-- gyroPrecessionTorqueFtLb:
+           Gyroscopic precession torque metadata.
+           Not directly used yet. -->
+      <gyroPrecessionTorqueFtLb>262.0</gyroPrecessionTorqueFtLb>
+      <!-- torqueRequiredFtLb:
+           Rotor torque required at design condition.
+           Used to justify kTorque. -->
+      <torqueRequiredFtLb>325.0</torqueRequiredFtLb>
+      <!-- equivalentShaftHp:
+           Equivalent shaft horsepower metadata.
+           Given value: 16 hp. Used with propulsiveEfficiency as the engine
+           power cap for rotor drive torque. -->
+      <equivalentShaftHp>16.0</equivalentShaftHp>
+      <!-- propulsiveEfficiency:
+           Design assumption used to convert equivalentShaftHp into available
+           rotor power. -->
+      <propulsiveEfficiency>0.85</propulsiveEfficiency>
+      <!-- numEngines:
+           Number of GP-76 engines. -->
+      <numEngines>2</numEngines>
+      <!-- engineHpEach:
+           GP-76 power metadata.
+           Current torque model uses thrust and radius, not HP curve. -->
+      <engineHpEach>8.0</engineHpEach>
+      <!-- mainBladeSparOdMm:
+           Main blade spar outer diameter metadata. -->
+      <mainBladeSparOdMm>30.0</mainBladeSparOdMm>
+      <!-- mainBladeSparIdMm:
+           Main blade spar inner diameter metadata. -->
+      <mainBladeSparIdMm>28.0</mainBladeSparIdMm>
+    </plugin>
+
+    <include>
+      <uri>model://gps</uri>
+      <pose>0.1 0 0 0 0 0</pose>
+      <name>gps0</name>
+    </include>
+    <joint name="gps0_joint" type="fixed">
+      <child>gps0::link</child>
+      <parent>base_link</parent>
+    </joint>
+
+    <plugin name="groundtruth_plugin" filename="libgazebo_groundtruth_plugin.so">
+      <robotNamespace/>
+    </plugin>
+    <plugin name="magnetometer_plugin" filename="libgazebo_magnetometer_plugin.so">
+      <robotNamespace/>
+      <pubRate>100</pubRate>
+      <noiseDensity>0.0004</noiseDensity>
+      <randomWalk>6.4e-06</randomWalk>
+      <biasCorrelationTime>600</biasCorrelationTime>
+      <magTopic>/mag</magTopic>
+    </plugin>
+    <plugin name="barometer_plugin" filename="libgazebo_barometer_plugin.so">
+      <robotNamespace/>
+      <pubRate>50</pubRate>
+      <baroTopic>/baro</baroTopic>
+      <baroDriftPaPerSec>0</baroDriftPaPerSec>
+    </plugin>
+    <plugin name="mavlink_interface" filename="libgazebo_mavlink_interface.so">
+      <robotNamespace/>
+      <imuSubTopic>/imu</imuSubTopic>
+      <magSubTopic>/mag</magSubTopic>
+      <baroSubTopic>/baro</baroSubTopic>
+      <mavlink_addr>INADDR_ANY</mavlink_addr>
+      <mavlink_tcp_port>4560</mavlink_tcp_port>
+      <mavlink_udp_port>14560</mavlink_udp_port>
+      <serialEnabled>0</serialEnabled>
+      <serialDevice>/dev/ttyACM0</serialDevice>
+      <baudRate>921600</baudRate>
+      <qgc_addr>INADDR_ANY</qgc_addr>
+      <qgc_udp_port>14550</qgc_udp_port>
+      <sdk_addr>INADDR_ANY</sdk_addr>
+      <sdk_udp_port>14540</sdk_udp_port>
+      <hil_mode>0</hil_mode>
+      <hil_state_level>0</hil_state_level>
+      <send_vision_estimation>0</send_vision_estimation>
+      <send_odometry>1</send_odometry>
+      <enable_lockstep>1</enable_lockstep>
+      <!-- The FC/IMU is mounted on rotor_link, while stock PX4 still expects
+           body-frame IMU data. De-rotate the rotor-frame IMU into base_link
+           before forwarding it to PX4. -->
+      <derotateImuToBaseLink>true</derotateImuToBaseLink>
+      <derotateImuBaseLinkName>base_link</derotateImuBaseLinkName>
+      <derotateImuSensorLinkName>/imu_link</derotateImuSensorLinkName>
+      <use_tcp>1</use_tcp>
+      <motorSpeedCommandPubTopic>/gazebo/command/motor_speed</motorSpeedCommandPubTopic>
+      <control_channels>
+        <channel name="engine_throttle">
+          <input_index>0</input_index>
+          <input_offset>0</input_offset>
+          <input_scaling>1000</input_scaling>
+          <zero_position_disarmed>0</zero_position_disarmed>
+          <zero_position_armed>0</zero_position_armed>
+          <joint_control_type>velocity</joint_control_type>
+        </channel>
+        <channel name="collective">
+          <input_index>1</input_index>
+          <input_offset>0</input_offset>
+          <input_scaling>1000</input_scaling>
+          <zero_position_disarmed>0</zero_position_disarmed>
+          <zero_position_armed>0</zero_position_armed>
+          <joint_control_type>velocity</joint_control_type>
+        </channel>
+        <channel name="roll_cyclic">
+          <input_index>2</input_index>
+          <input_offset>0</input_offset>
+          <input_scaling>1000</input_scaling>
+          <zero_position_disarmed>0</zero_position_disarmed>
+          <zero_position_armed>0</zero_position_armed>
+          <joint_control_type>velocity</joint_control_type>
+        </channel>
+        <channel name="pitch_cyclic">
+          <input_index>3</input_index>
+          <input_offset>0</input_offset>
+          <input_scaling>1000</input_scaling>
+          <zero_position_disarmed>0</zero_position_disarmed>
+          <zero_position_armed>0</zero_position_armed>
+          <joint_control_type>velocity</joint_control_type>
+        </channel>
+      </control_channels>
+    </plugin>
+    <plugin name="rotors_gazebo_imu_plugin" filename="libgazebo_imu_plugin.so">
+      <robotNamespace/>
+      <linkName>/imu_link</linkName>
+      <imuTopic>/imu</imuTopic>
+      <gyroscopeNoiseDensity>0.00018665</gyroscopeNoiseDensity>
+      <gyroscopeRandomWalk>3.8785e-05</gyroscopeRandomWalk>
+      <gyroscopeBiasCorrelationTime>1000.0</gyroscopeBiasCorrelationTime>
+      <gyroscopeTurnOnBiasSigma>0.0087</gyroscopeTurnOnBiasSigma>
+      <accelerometerNoiseDensity>0.00186</accelerometerNoiseDensity>
+      <accelerometerRandomWalk>0.006</accelerometerRandomWalk>
+      <accelerometerBiasCorrelationTime>300.0</accelerometerBiasCorrelationTime>
+      <accelerometerTurnOnBiasSigma>0.196</accelerometerTurnOnBiasSigma>
+    </plugin>
+
+  </model>
+</sdf>
