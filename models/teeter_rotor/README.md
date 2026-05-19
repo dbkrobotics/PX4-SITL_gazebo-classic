@@ -20,6 +20,38 @@ This is an engineering/debugging simulation model. It is not yet a high-fidelity
 
 ---
 
+## 1.1 SITL and HITL Split
+
+Use the default model for SITL:
+
+```sh
+make px4_sitl_default gazebo-classic_teeter_rotor
+```
+
+This uses `models/teeter_rotor/teeter_rotor.sdf`, where serial HITL is disabled.
+
+Use the separate HITL model when connecting a Pixhawk:
+
+```sh
+GAZEBO_MODEL_PATH=$PWD/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models \
+gazebo --verbose Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/teeter_rotor_hitl.world
+```
+
+This loads `models/teeter_rotor_hitl/teeter_rotor_hitl.sdf` inside a world with
+`ground_plane`, where serial HITL is enabled for the Pixhawk 6X Pro. Pair it
+with the NuttX airframe `4991_teeter_rotor.hil`.
+
+Firmware is split the same way:
+
+```sh
+make px4_fmu-v6x_default
+make px4_fmu-v6x_hitl
+```
+
+Use `px4_fmu-v6x_default` for normal Pixhawk 6X Pro hardware firmware. Use `px4_fmu-v6x_hitl` for HITL; it adds the teeter rotor controller and `pwm_out_sim`, while trimming unused fixed-wing, VTOL, gimbal, DDS, and autotune modules to keep flash usage under control.
+
+---
+
 ## 2. What We Have Built So Far
 
 ### 2.1 Initial SDF/Gazebo Model
@@ -38,7 +70,7 @@ At first, the rotor RPM was forced directly and lift was applied as a simple upw
 We changed the model so that:
 
 - empty vehicle weight is fixed at 42 lb,
-- payload is adjustable with `payloadWeightLb`,
+- physical payload mass is adjustable with `payloadMassLb`,
 - rotor RPM can be tested independently.
 
 This allowed us to test the payload capability concept.
@@ -142,29 +174,29 @@ This is represented in:
 
 ## 3. Main Design Data Reflected in the Model
 
-| Parameter | Value |
-|---|---:|
-| Rotor radius | 12 ft |
-| Hub radius | 3 ft |
-| Number of blades | 2 |
-| Chord | 10.5 in |
-| Airfoil | NACA 23015 |
-| Max RPM | 220 rpm |
-| Tip speed | 276 ft/s |
-| Tip weight | 2.53 lb each |
-| Empty weight | 42 lb |
-| Design gross weight | 440 lb |
-| Design pitch / collective | 7.27 deg |
-| Pitch / collective range | 2 to 12 deg |
-| Forward speed metadata | 20 mph |
-| Torque required | 325 ft-lb |
-| Equivalent shaft HP | 16 hp |
-| Engine type | 2x GP-76 |
-| Engine thrust | 54 lbf each |
-| Engine radius | 3 ft |
-| Pre-cone | about 11 deg |
-| Teeter range metadata | +/- 15 deg |
-| Rotor twist metadata | 6 deg linear |
+| Parameter                 |        Value |
+| ------------------------- | -----------: |
+| Rotor radius              |        12 ft |
+| Hub radius                |         3 ft |
+| Number of blades          |            2 |
+| Chord                     |      10.5 in |
+| Airfoil                   |   NACA 23015 |
+| Max RPM                   |      220 rpm |
+| Tip speed                 |     276 ft/s |
+| Tip weight                | 2.53 lb each |
+| Empty weight              |        42 lb |
+| Design gross weight       |       440 lb |
+| Design pitch / collective |     7.27 deg |
+| Pitch / collective range  |  2 to 12 deg |
+| Forward speed metadata    |       20 mph |
+| Torque required           |    325 ft-lb |
+| Equivalent shaft HP       |        16 hp |
+| Engine type               |     2x GP-76 |
+| Engine thrust             |  54 lbf each |
+| Engine radius             |         3 ft |
+| Pre-cone                  | about 11 deg |
+| Teeter range metadata     |   +/- 15 deg |
+| Rotor twist metadata      | 6 deg linear |
 
 ---
 
@@ -216,19 +248,21 @@ Main tuning variables:
 
 ### 4.4 Payload
 
-Payload is currently a virtual downward force:
+Payload is modeled as a physical `payload_link` with mass and inertia:
 
 ```xml
-<payloadWeightLb>360.0</payloadWeightLb>
+<payloadEnabled>true</payloadEnabled>
+<payloadMassLb>360.0</payloadMassLb>
 ```
 
-It does not yet affect:
+It affects:
 
 - inertia,
 - center of gravity,
 - pitch/roll moments due to payload position.
 
-This is acceptable for vertical lift testing but must be improved later.
+For empty-vehicle tests, set `payloadEnabled` to `false`. The plugin keeps a
+small dummy inertial body and hides the payload visual.
 
 ---
 
@@ -253,7 +287,8 @@ For forced RPM testing:
 ### Payload
 
 ```xml
-<payloadWeightLb>360.0</payloadWeightLb>
+<payloadEnabled>true</payloadEnabled>
+<payloadMassLb>360.0</payloadMassLb>
 ```
 
 Suggested values:
@@ -308,7 +343,8 @@ Current implementation includes visual blade pre-cone and pre-cone force applica
 ```xml
 <useEngineDynamics>false</useEngineDynamics>
 <targetRpm>220.0</targetRpm>
-<payloadWeightLb>360.0</payloadWeightLb>
+<payloadEnabled>true</payloadEnabled>
+<payloadMassLb>360.0</payloadMassLb>
 ```
 
 Expected:
@@ -324,7 +360,8 @@ Expected:
 <useEngineDynamics>true</useEngineDynamics>
 <targetRpm>0.0</targetRpm>
 <engineThrottle>1.0</engineThrottle>
-<payloadWeightLb>360.0</payloadWeightLb>
+<payloadEnabled>true</payloadEnabled>
+<payloadMassLb>360.0</payloadMassLb>
 ```
 
 Expected:
@@ -353,11 +390,12 @@ Heavy payload may not lift.
 Try:
 
 ```xml
-<payloadWeightLb>0.0</payloadWeightLb>
-<payloadWeightLb>200.0</payloadWeightLb>
-<payloadWeightLb>360.0</payloadWeightLb>
-<payloadWeightLb>398.0</payloadWeightLb>
-<payloadWeightLb>420.0</payloadWeightLb>
+<payloadEnabled>false</payloadEnabled>
+<payloadEnabled>true</payloadEnabled>
+<payloadMassLb>200.0</payloadMassLb>
+<payloadMassLb>360.0</payloadMassLb>
+<payloadMassLb>398.0</payloadMassLb>
+<payloadMassLb>420.0</payloadMassLb>
 ```
 
 Expected:
@@ -459,7 +497,7 @@ Configure:
 
 ### Step 6: Physical Payload Link
 
-Replace virtual payload force with a real payload link:
+The old virtual payload force has been removed. Payload is represented by:
 
 ```text
 payload_link
@@ -493,7 +531,7 @@ Replace equivalent lift model with blade-element integration using:
 - radius = 12 ft,
 - hub radius = 3 ft,
 - twist = 6 deg,
-- local velocity = omega * r,
+- local velocity = omega \* r,
 - section lift/drag integration.
 
 This is the higher-fidelity final aerodynamic model.
@@ -510,7 +548,7 @@ make px4_sitl gazebo
 Manual Gazebo run:
 
 ```bash
-export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/Tools/sitl_gazebo/models
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models
 export GAZEBO_PLUGIN_PATH=$GAZEBO_PLUGIN_PATH:$(dirname $(find build -name "libteeter_rotor_plugin.so" | head -n 1))
 
 gazebo --verbose Tools/sitl_gazebo/worlds/empty.world
@@ -521,6 +559,39 @@ Insert model:
 ```text
 teeter_rotor
 ```
+
+Pixhawk 6X Pro HITL bring-up:
+
+Build and upload the HITL-specific Pixhawk 6X firmware. The
+`px4_fmu-v6x_hitl` configuration includes `teeter_control` and `pwm_out_sim`,
+which are required for this model's airframe and external HITL actuator bridge.
+The normal `px4_fmu-v6x_default` firmware remains the general hardware build.
+
+```bash
+make px4_fmu-v6x_hitl upload
+```
+
+After upload, select the HITL airframe:
+
+```sh
+param set SYS_AUTOSTART 4991
+param save
+reboot
+```
+
+Use the separate HITL model instead of editing the SITL model:
+
+```sh
+GAZEBO_MODEL_PATH=$PWD/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models \
+gazebo --verbose Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/teeter_rotor_hitl.world
+```
+
+Adjust `serialDevice` in `models/teeter_rotor_hitl/teeter_rotor_hitl.sdf` if
+the Pixhawk appears under a different `/dev/serial/by-id/...` path.
+
+Keep motors, ESCs, and servos disconnected for the first HITL run. In HITL,
+PX4 blocks real actuator output through lockdown, and Gazebo receives the
+simulated actuator stream through `pwm_out_sim`.
 
 ---
 

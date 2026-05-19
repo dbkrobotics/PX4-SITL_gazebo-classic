@@ -117,6 +117,111 @@
         </surface>
       </collision>
 
+      <!-- Landing feet at the tripod endpoints. These give Gazebo stable,
+           level contact patches instead of balancing the vehicle on cylinder
+           tips, which can make the model settle at a tilted angle. -->
+      <collision name="landing_foot_front_left_collision">
+        <pose>0.4500 0.3200 -0.8400 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.24 0.18 0.04</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1.0</mu>
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name="landing_foot_front_right_collision">
+        <pose>0.4500 -0.3200 -0.8400 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.24 0.18 0.04</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1.0</mu>
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name="landing_foot_rear_collision">
+        <pose>-0.4800 0.0000 -0.8400 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.24 0.18 0.04</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>0</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1.0</mu>
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name="landing_foot_front_left_visual">
+        <pose>0.4500 0.3200 -0.8400 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.24 0.18 0.04</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="landing_foot_front_right_visual">
+        <pose>0.4500 -0.3200 -0.8400 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.24 0.18 0.04</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
+      <visual name="landing_foot_rear_visual">
+        <pose>-0.4800 0.0000 -0.8400 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.24 0.18 0.04</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.05 0.05 0.05 1</ambient>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+        </material>
+      </visual>
       <visual name="tripod_mast_front_left_visual">
         <pose>0.2250 0.1600 -0.1600 0.000000 0.390870 -2.523448</pose>
         <geometry>
@@ -1214,17 +1319,18 @@
       <mavlink_addr>INADDR_ANY</mavlink_addr>
       <mavlink_tcp_port>4560</mavlink_tcp_port>
       <mavlink_udp_port>14560</mavlink_udp_port>
-      <serialEnabled>0</serialEnabled>
-      <serialDevice>/dev/ttyACM0</serialDevice>
+      <serialEnabled>1</serialEnabled>
+      <serialDevice>/dev/serial/by-id/usb-Auterion_PX4_FMU_v6X.x_0-if00</serialDevice>
       <baudRate>921600</baudRate>
       <qgc_addr>INADDR_ANY</qgc_addr>
       <qgc_udp_port>14550</qgc_udp_port>
       <sdk_addr>INADDR_ANY</sdk_addr>
       <sdk_udp_port>14540</sdk_udp_port>
-      <hil_mode>0</hil_mode>
+      <hil_mode>1</hil_mode>
       <hil_state_level>0</hil_state_level>
+      <imu_rate>100</imu_rate>
       <send_vision_estimation>0</send_vision_estimation>
-      <send_odometry>1</send_odometry>
+      <send_odometry>0</send_odometry>
       <enable_lockstep>1</enable_lockstep>
       <!-- The FC/IMU is mounted on rotor_link, while stock PX4 still expects
            body-frame IMU data. De-rotate the rotor-frame IMU into base_link

@@ -43,6 +43,10 @@ public:
     this->blade2_indicator_link_ = this->model_->GetLink(blade2_indicator_link_name);
     this->joint_ = this->model_->GetJoint(joint_name);
 
+    this->node_.reset(new transport::Node());
+    this->node_->Init(this->model_->GetWorld()->Name());
+    this->payload_visual_pub_ = this->node_->Advertise<msgs::Visual>("~/visual", 10);
+
     if (!this->base_link_) {
       gzerr << "[TeeterRotorPlugin] Base link not found: " << base_link_name << std::endl;
       return;
@@ -70,7 +74,6 @@ public:
 
     // Primary variables.
     this->ReadDouble(sdf, "targetRpm", this->target_rpm_);
-    this->ReadDouble(sdf, "payloadWeightLb", this->payload_weight_lb_);
     this->ReadBool(sdf, "payloadEnabled", this->payload_enabled_);
     this->ReadDouble(sdf, "payloadMassLb", this->payload_mass_lb_);
     this->ReadVector3(sdf, "payloadOffsetFromCogM", this->payload_offset_from_cog_m_);
@@ -179,10 +182,8 @@ public:
     this->empty_weight_kg_ = LbMassToKg(this->empty_weight_lb_);
     this->payload_mass_kg_ = this->payload_enabled_ ? LbMassToKg(this->payload_mass_lb_) : 0.0;
     this->physical_payload_weight_n_ = this->payload_enabled_ ? LbForceToN(this->payload_mass_lb_) : 0.0;
-    this->payload_weight_n_ = LbForceToN(this->payload_weight_lb_);
     this->current_gross_weight_lb_ = this->empty_weight_lb_
-      + (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0)
-      + this->payload_weight_lb_;
+      + (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0);
     this->current_gross_weight_n_ = LbForceToN(this->current_gross_weight_lb_);
 
     this->engine_radius_m_ = FtToM(this->engine_radius_ft_);
@@ -213,9 +214,6 @@ public:
     this->ConfigurePayloadLink();
 
     if (this->enable_px4_actuator_input_) {
-      this->node_.reset(new transport::Node());
-      this->node_->Init(this->model_->GetWorld()->Name());
-
       this->px4_motor_speed_sub_ =
         this->node_->Subscribe(this->px4_actuator_topic_,
           &TeeterRotorPlugin::OnPx4MotorSpeed, this);
@@ -309,12 +307,27 @@ private:
       geometry_scale,
       geometry_scale,
       geometry_scale));
+    this->SetPayloadVisualVisible(enabled);
 
     const ignition::math::Pose3d payload_pose(
       this->payload_offset_from_cog_m_,
       ignition::math::Quaterniond(0.0, 0.0, 0.0));
     this->payload_link_->SetInitialRelativePose(payload_pose);
     this->payload_link_->SetRelativePose(payload_pose);
+  }
+
+  void SetPayloadVisualVisible(bool visible)
+  {
+    if (!this->payload_visual_pub_ || !this->payload_link_) {
+      return;
+    }
+
+    msgs::Visual visual_msg;
+    visual_msg.set_name(this->payload_link_->GetScopedName() + "::payload_plate_visual");
+    visual_msg.set_parent_name(this->payload_link_->GetScopedName());
+    visual_msg.set_visible(visible);
+    visual_msg.set_transparency(visible ? 0.0 : 1.0);
+    this->payload_visual_pub_->Publish(visual_msg);
   }
 
   double PitchFactor(double pitch_deg) const
@@ -615,29 +628,29 @@ private:
     this->has_px4_command_ = true;
 
     const double debug_interval = std::max(0.02, this->px4_input_debug_interval_sec_);
-    // if (this->print_px4_input_debug_ &&
-    //     (this->last_px4_command_time_ - this->last_px4_print_time_).Double() > debug_interval) {
-    //   std::cout << "[TeeterRotorPlugin][PX4 INPUT] "
-    //             << "raw=["
-    //             << _msg->motor_speed(0) << ", "
-    //             << _msg->motor_speed(1) << ", "
-    //             << _msg->motor_speed(2) << ", "
-    //             << _msg->motor_speed(3) << "] "
-    //             << "norm=["
-    //             << ch0 << ", "
-    //             << ch1 << ", "
-    //             << ch2 << ", "
-    //             << ch3 << "] "
-    //             << "cmd={"
-    //             << "throttle:" << this->px4_engine_throttle_cmd_
-    //             << ", collective_deg:" << this->px4_collective_deg_cmd_
-    //             << ", roll_cyclic_deg:" << this->px4_roll_cyclic_deg_cmd_
-    //             << ", pitch_cyclic_deg:" << this->px4_pitch_cyclic_deg_cmd_
-    //             << "}"
-    //             << std::endl;
+    if (this->print_px4_input_debug_ &&
+        (this->last_px4_command_time_ - this->last_px4_print_time_).Double() > debug_interval) {
+      std::cout << "[TeeterRotorPlugin][PX4 INPUT] "
+                << "raw=["
+                << _msg->motor_speed(0) << ", "
+                << _msg->motor_speed(1) << ", "
+                << _msg->motor_speed(2) << ", "
+                << _msg->motor_speed(3) << "] "
+                << "norm=["
+                << ch0 << ", "
+                << ch1 << ", "
+                << ch2 << ", "
+                << ch3 << "] "
+                << "cmd={"
+                << "throttle:" << this->px4_engine_throttle_cmd_
+                << ", collective_deg:" << this->px4_collective_deg_cmd_
+                << ", roll_cyclic_deg:" << this->px4_roll_cyclic_deg_cmd_
+                << ", pitch_cyclic_deg:" << this->px4_pitch_cyclic_deg_cmd_
+                << "}"
+                << std::endl;
 
-    //   this->last_px4_print_time_ = this->last_px4_command_time_;
-    // }
+      this->last_px4_print_time_ = this->last_px4_command_time_;
+    }
   }
 
   bool Px4CommandActive(const common::Time &now) const
@@ -737,7 +750,6 @@ private:
           << ", offset from CoG: [" << this->payload_offset_from_cog_m_.X()
           << ", " << this->payload_offset_from_cog_m_.Y()
           << ", " << this->payload_offset_from_cog_m_.Z() << "] m\n"
-          << "Legacy virtual payload force: " << this->payload_weight_lb_ << " lb\n"
           << "Fixed blade pitches: [" << this->blade1_pitch_deg_ << ", "
           << this->blade2_pitch_deg_ << "] deg\n"
           << "Cyclic pitch: " << (this->use_cyclic_pitch_ ? "on" : "off")
@@ -808,9 +820,6 @@ private:
     const ignition::math::Vector3d blade2_force_world =
       rotor_pose.Rot().RotateVector(ignition::math::Vector3d(0.0, 0.0, blade2_lift_n));
 
-    const double payload_force_n = (!this->enable_px4_actuator_input_ || px4_command_active)
-      ? this->payload_weight_n_ : 0.0;
-    const ignition::math::Vector3d payload_force_world(0.0, 0.0, -payload_force_n);
 #else
     const gazebo::math::Pose rotor_pose = this->rotor_link_->GetWorldPose();
 
@@ -827,14 +836,10 @@ private:
     const gazebo::math::Vector3 blade2_force_world =
       rotor_pose.rot.RotateVector(gazebo::math::Vector3(0.0, 0.0, blade2_lift_n));
 
-    const double payload_force_n = (!this->enable_px4_actuator_input_ || px4_command_active)
-      ? this->payload_weight_n_ : 0.0;
-    const gazebo::math::Vector3 payload_force_world(0.0, 0.0, -payload_force_n);
 #endif
 
     this->base_link_->AddForceAtWorldPosition(blade1_force_world, blade1_pos_world);
     this->base_link_->AddForceAtWorldPosition(blade2_force_world, blade2_pos_world);
-    this->base_link_->AddForce(payload_force_world);
 
     double east_disk_tilt_deg = 0.0;
     double north_disk_tilt_deg = 0.0;
@@ -885,13 +890,12 @@ private:
 
     if ((now - this->last_print_time_).Double() > 1.0) {
       const double rpm = RadPerSecToRpm(omega_cmd);
-      const double net_n = total_lift_n - payload_force_n - this->physical_payload_weight_n_
+      const double net_n = total_lift_n - this->physical_payload_weight_n_
         - this->EmptyWeightNewton();
 
       gzmsg << "[TeeterRotorPlugin] rpm = "
             << rpm
             << ", payload = " << (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0) << " lb"
-            << ", virtual payload = " << this->payload_weight_lb_ << " lb"
             << ", azimuth = " << this->rotor_azimuth_rad_ * 180.0 / M_PI << " deg"
             << ", blade pitches = [" << blade1_pitch_cmd_deg << ", " << blade2_pitch_cmd_deg << "] deg"
             << ", cyclic = [" << this->roll_cyclic_deg_ << ", " << this->pitch_cyclic_deg_ << "] deg"
@@ -937,6 +941,7 @@ private:
 
   transport::NodePtr node_;
   transport::SubscriberPtr px4_motor_speed_sub_;
+  transport::PublisherPtr payload_visual_pub_;
 
   physics::ModelPtr model_;
   physics::LinkPtr base_link_;
@@ -949,7 +954,6 @@ private:
 
   // Primary variables.
   double target_rpm_{0.0};
-  double payload_weight_lb_{0.0};
   bool payload_enabled_{true};
   double payload_mass_lb_{360.0};
   double disabled_payload_mass_kg_{0.5};
@@ -1045,7 +1049,6 @@ private:
   double empty_weight_kg_{19.05};
   double payload_mass_kg_{163.29};
   double physical_payload_weight_n_{1601.36};
-  double payload_weight_n_{0.0};
   double current_gross_weight_lb_{402.0};
   double current_gross_weight_n_{1788.18};
 
