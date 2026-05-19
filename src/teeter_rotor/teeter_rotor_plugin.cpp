@@ -928,7 +928,7 @@ private:
   double cyclic_disk_tilt_per_deg_{0.0};
   double max_cyclic_disk_tilt_deg_{8.0};
   double px4_command_timeout_sec_{0.5};
-  bool print_px4_input_debug_{true};
+  bool print_px4_input_debug_{false};
   double px4_input_debug_interval_sec_{0.2};
 
   bool has_px4_command_{false};

@@ -947,7 +947,7 @@
       <!-- PX4 input debug:
            Prints raw motor_speed, normalized values, and mapped command values
            to the Gazebo terminal so QGC stick inputs can be inspected live. -->
-      <printPx4InputDebug>true</printPx4InputDebug>
+      <printPx4InputDebug>false</printPx4InputDebug>
       <px4InputDebugIntervalSec>0.2</px4InputDebugIntervalSec>
 
       <!-- Engine dynamics -->
@@ -1232,6 +1232,11 @@
       <derotateImuToBaseLink>true</derotateImuToBaseLink>
       <derotateImuBaseLinkName>base_link</derotateImuBaseLinkName>
       <derotateImuSensorLinkName>/imu_link</derotateImuSensorLinkName>
+      <derotateImuUseFakeAs5600>true</derotateImuUseFakeAs5600>
+      <fakeAs5600ZeroOffsetRad>0.0</fakeAs5600ZeroOffsetRad>
+      <fakeAs5600Direction>1</fakeAs5600Direction>
+      <fakeAs5600RateLpfHz>30.0</fakeAs5600RateLpfHz>
+      <fakeAs5600UlogIntervalSec>0.02</fakeAs5600UlogIntervalSec>
       <use_tcp>1</use_tcp>
       <motorSpeedCommandPubTopic>/gazebo/command/motor_speed</motorSpeedCommandPubTopic>
       <control_channels>

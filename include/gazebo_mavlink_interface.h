@@ -157,6 +157,10 @@ private:
   std::string link_name_;
   std::string derotate_imu_base_link_name_{"base_link"};
   std::string derotate_imu_sensor_link_name_{"/imu_link"};
+  double fake_as5600_zero_offset_rad_{0.0};
+  double fake_as5600_ulog_interval_s_{0.0};
+  double fake_as5600_rate_lpf_hz_{30.0};
+  int fake_as5600_direction_{1};
 
   transport::NodePtr node_handle_;
   transport::PublisherPtr motor_velocity_reference_pub_;
@@ -170,6 +174,13 @@ private:
   bool send_vision_estimation_{false};
   bool send_odometry_{false};
   bool derotate_imu_to_base_link_{false};
+  bool derotate_imu_use_fake_as5600_{false};
+  bool fake_as5600_rate_initialized_{false};
+  bool fake_as5600_rate_lpf_initialized_{false};
+  common::Time fake_as5600_last_ulog_time_{0};
+  common::Time fake_as5600_last_rate_time_{0};
+  int fake_as5600_last_raw_angle_{0};
+  double fake_as5600_filtered_theta_dot_{0.0};
 
   std::vector<physics::JointPtr> joints_;
   std::vector<common::PID> pids_;
