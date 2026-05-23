@@ -94,6 +94,12 @@ public:
     this->ReadBool(sdf, "swapCyclicInputs", this->swap_cyclic_inputs_);
     this->ReadDouble(sdf, "rollCyclicSign", this->roll_cyclic_sign_);
     this->ReadDouble(sdf, "pitchCyclicSign", this->pitch_cyclic_sign_);
+    this->ReadBool(sdf, "enableTeeterDynamics", this->enable_teeter_dynamics_);
+    this->ReadDouble(sdf, "teeterInertiaKgm2", this->teeter_inertia_kgm2_);
+    this->ReadDouble(sdf, "teeterDampingNmPerRadS", this->teeter_damping_nm_per_rad_s_);
+    this->ReadDouble(sdf, "teeterStiffnessNmPerRad", this->teeter_stiffness_nm_per_rad_);
+    this->ReadDouble(sdf, "teeterMomentSign", this->teeter_moment_sign_);
+    this->ReadDouble(sdf, "teeterRateLimitDegS", this->teeter_rate_limit_deg_s_);
 
     // PX4 actuator bridge.
     this->ReadBool(sdf, "enablePx4ActuatorInput", this->enable_px4_actuator_input_);
@@ -113,6 +119,8 @@ public:
     this->ReadDouble(sdf, "px4CommandTimeoutSec", this->px4_command_timeout_sec_);
     this->ReadBool(sdf, "printPx4InputDebug", this->print_px4_input_debug_);
     this->ReadDouble(sdf, "px4InputDebugIntervalSec", this->px4_input_debug_interval_sec_);
+    this->ReadBool(sdf, "printTeeterStateDebug", this->print_teeter_state_debug_);
+    this->ReadDouble(sdf, "teeterStateDebugIntervalSec", this->teeter_state_debug_interval_sec_);
 
     // Engine dynamics.
     this->ReadBool(sdf, "useEngineDynamics", this->use_engine_dynamics_);
@@ -564,6 +572,65 @@ private:
     }
   }
 
+  double StepTeeterAngle(const common::Time &now, double blade1_lift_n, double blade2_lift_n)
+  {
+    const double limit_rad = std::max(0.0, DegToRad(this->teeter_angle_limit_deg_));
+
+    if (!this->enable_teeter_dynamics_) {
+      this->teeter_angle_rad_ = 0.0;
+      this->teeter_rate_rad_s_ = 0.0;
+      return this->teeter_angle_rad_;
+    }
+
+    if (!this->teeter_time_initialized_) {
+      this->last_teeter_update_time_ = now;
+      this->teeter_time_initialized_ = true;
+      return this->teeter_angle_rad_;
+    }
+
+    double dt = (now - this->last_teeter_update_time_).Double();
+    this->last_teeter_update_time_ = now;
+
+    if (dt < 0.0) {
+      dt = 0.0;
+    }
+
+    dt = std::min(dt, 0.02);
+
+    // Blade 1 is on +X and blade 2 is on -X in rotor coordinates. Vertical
+    // lift imbalance therefore creates a teeter moment about the rotor Y axis.
+    const double lift_moment_nm =
+      this->teeter_moment_sign_ * this->blade_lift_x_m_ * (blade2_lift_n - blade1_lift_n);
+    const double restoring_moment_nm = -this->teeter_stiffness_nm_per_rad_ * this->teeter_angle_rad_;
+    const double damping_moment_nm = -this->teeter_damping_nm_per_rad_s_ * this->teeter_rate_rad_s_;
+    const double inertia = std::max(1e-6, this->teeter_inertia_kgm2_);
+    const double teeter_accel_rad_s2 =
+      (lift_moment_nm + restoring_moment_nm + damping_moment_nm) / inertia;
+
+    this->teeter_rate_rad_s_ += teeter_accel_rad_s2 * dt;
+
+    const double rate_limit_rad_s = std::max(0.0, DegToRad(this->teeter_rate_limit_deg_s_));
+    if (rate_limit_rad_s > 0.0) {
+      this->teeter_rate_rad_s_ = std::max(-rate_limit_rad_s,
+        std::min(this->teeter_rate_rad_s_, rate_limit_rad_s));
+    }
+
+    this->teeter_angle_rad_ += this->teeter_rate_rad_s_ * dt;
+
+    if (limit_rad > 0.0) {
+      if (this->teeter_angle_rad_ > limit_rad) {
+        this->teeter_angle_rad_ = limit_rad;
+        this->teeter_rate_rad_s_ = std::min(0.0, this->teeter_rate_rad_s_);
+
+      } else if (this->teeter_angle_rad_ < -limit_rad) {
+        this->teeter_angle_rad_ = -limit_rad;
+        this->teeter_rate_rad_s_ = std::max(0.0, this->teeter_rate_rad_s_);
+      }
+    }
+
+    return this->teeter_angle_rad_;
+  }
+
 
   double Clamp01(double value) const
   {
@@ -761,6 +828,12 @@ private:
           << "Cyclic input tuning: swap=" << (this->swap_cyclic_inputs_ ? "true" : "false")
           << ", roll sign=" << (this->roll_cyclic_sign_ >= 0.0 ? 1 : -1)
           << ", pitch sign=" << (this->pitch_cyclic_sign_ >= 0.0 ? 1 : -1) << "\n"
+          << "Teeter dynamics: " << (this->enable_teeter_dynamics_ ? "on" : "off")
+          << ", limit: " << this->teeter_angle_limit_deg_
+          << " deg, inertia: " << this->teeter_inertia_kgm2_
+          << " kg*m^2, damping: " << this->teeter_damping_nm_per_rad_s_
+          << " N*m/(rad/s), stiffness: " << this->teeter_stiffness_nm_per_rad_
+          << " N*m/rad\n"
           << "Pre-cone: " << this->pre_cone_angle_deg_ << " deg, force point x/z: "
           << this->blade_lift_x_m_ << " / " << this->blade_lift_z_m_ << " m\n"
           << "PX4 bridge: " << (this->enable_px4_actuator_input_ ? "on" : "off")
@@ -803,38 +876,43 @@ private:
     const double blade1_lift_n = this->BladeLiftNewton(omega_cmd, blade1_pitch_cmd_deg);
     const double blade2_lift_n = this->BladeLiftNewton(omega_cmd, blade2_pitch_cmd_deg);
     const double total_lift_n = blade1_lift_n + blade2_lift_n;
+    const double teeter_angle_rad = this->StepTeeterAngle(now, blade1_lift_n, blade2_lift_n);
 
 #if GAZEBO_MAJOR_VERSION >= 8
     const ignition::math::Pose3d rotor_pose = this->rotor_link_->WorldPose();
+    const ignition::math::Quaterniond teeter_rotation(0.0, teeter_angle_rad, 0.0);
+    const ignition::math::Quaterniond rotor_disk_to_world = rotor_pose.Rot() * teeter_rotation;
 
     const ignition::math::Vector3d blade1_local(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
     const ignition::math::Vector3d blade2_local(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
 
     const ignition::math::Vector3d blade1_pos_world =
-      rotor_pose.Pos() + rotor_pose.Rot().RotateVector(blade1_local);
+      rotor_pose.Pos() + rotor_disk_to_world.RotateVector(blade1_local);
     const ignition::math::Vector3d blade2_pos_world =
-      rotor_pose.Pos() + rotor_pose.Rot().RotateVector(blade2_local);
+      rotor_pose.Pos() + rotor_disk_to_world.RotateVector(blade2_local);
 
     const ignition::math::Vector3d blade1_force_world =
-      rotor_pose.Rot().RotateVector(ignition::math::Vector3d(0.0, 0.0, blade1_lift_n));
+      rotor_disk_to_world.RotateVector(ignition::math::Vector3d(0.0, 0.0, blade1_lift_n));
     const ignition::math::Vector3d blade2_force_world =
-      rotor_pose.Rot().RotateVector(ignition::math::Vector3d(0.0, 0.0, blade2_lift_n));
+      rotor_disk_to_world.RotateVector(ignition::math::Vector3d(0.0, 0.0, blade2_lift_n));
 
 #else
     const gazebo::math::Pose rotor_pose = this->rotor_link_->GetWorldPose();
+    const gazebo::math::Quaternion teeter_rotation(0.0, teeter_angle_rad, 0.0);
+    const gazebo::math::Quaternion rotor_disk_to_world = rotor_pose.rot * teeter_rotation;
 
     const gazebo::math::Vector3 blade1_local(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
     const gazebo::math::Vector3 blade2_local(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
 
     const gazebo::math::Vector3 blade1_pos_world =
-      rotor_pose.pos + rotor_pose.rot.RotateVector(blade1_local);
+      rotor_pose.pos + rotor_disk_to_world.RotateVector(blade1_local);
     const gazebo::math::Vector3 blade2_pos_world =
-      rotor_pose.pos + rotor_pose.rot.RotateVector(blade2_local);
+      rotor_pose.pos + rotor_disk_to_world.RotateVector(blade2_local);
 
     const gazebo::math::Vector3 blade1_force_world =
-      rotor_pose.rot.RotateVector(gazebo::math::Vector3(0.0, 0.0, blade1_lift_n));
+      rotor_disk_to_world.RotateVector(gazebo::math::Vector3(0.0, 0.0, blade1_lift_n));
     const gazebo::math::Vector3 blade2_force_world =
-      rotor_pose.rot.RotateVector(gazebo::math::Vector3(0.0, 0.0, blade2_lift_n));
+      rotor_disk_to_world.RotateVector(gazebo::math::Vector3(0.0, 0.0, blade2_lift_n));
 
 #endif
 
@@ -888,24 +966,28 @@ private:
 #endif
     }
 
-    if ((now - this->last_print_time_).Double() > 1.0) {
+    const double state_debug_interval = std::max(0.02, this->teeter_state_debug_interval_sec_);
+    if (this->print_teeter_state_debug_ &&
+        (now - this->last_print_time_).Double() > state_debug_interval) {
       const double rpm = RadPerSecToRpm(omega_cmd);
       const double net_n = total_lift_n - this->physical_payload_weight_n_
         - this->EmptyWeightNewton();
 
-      gzmsg << "[TeeterRotorPlugin] rpm = "
-            << rpm
-            << ", payload = " << (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0) << " lb"
-            << ", azimuth = " << this->rotor_azimuth_rad_ * 180.0 / M_PI << " deg"
-            << ", blade pitches = [" << blade1_pitch_cmd_deg << ", " << blade2_pitch_cmd_deg << "] deg"
-            << ", cyclic = [" << this->roll_cyclic_deg_ << ", " << this->pitch_cyclic_deg_ << "] deg"
-            << ", disk tilt E/N = [" << east_disk_tilt_deg << ", " << north_disk_tilt_deg << "] deg"
-            << ", disk force E/N = [" << east_disk_tilt_force_n << ", " << north_disk_tilt_force_n << "] N"
-            << ", total lift = " << total_lift_n << " N"
-            << ", net = " << net_n << " N"
-            << ", drive torque = " << this->DriveTorqueNewtonMeter(omega_cmd) << " N*m"
-            << ", drag torque = " << this->DragTorqueNewtonMeter(omega_cmd) << " N*m"
-            << std::endl;
+      std::cout << "[TeeterRotorPlugin] rpm = "
+                << rpm
+                << ", payload = " << (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0) << " lb"
+                << ", azimuth = " << this->rotor_azimuth_rad_ * 180.0 / M_PI << " deg"
+                << ", blade pitches = [" << blade1_pitch_cmd_deg << ", " << blade2_pitch_cmd_deg << "] deg"
+                << ", teeter = " << this->teeter_angle_rad_ * 180.0 / M_PI
+                << " deg, teeter_rate = " << this->teeter_rate_rad_s_ * 180.0 / M_PI << " deg/s"
+                << ", cyclic = [" << this->roll_cyclic_deg_ << ", " << this->pitch_cyclic_deg_ << "] deg"
+                << ", disk tilt E/N = [" << east_disk_tilt_deg << ", " << north_disk_tilt_deg << "] deg"
+                << ", disk force E/N = [" << east_disk_tilt_force_n << ", " << north_disk_tilt_force_n << "] N"
+                << ", total lift = " << total_lift_n << " N"
+                << ", net = " << net_n << " N"
+                << ", drive torque = " << this->DriveTorqueNewtonMeter(omega_cmd) << " N*m"
+                << ", drag torque = " << this->DragTorqueNewtonMeter(omega_cmd) << " N*m"
+                << std::endl;
 
       this->last_print_time_ = now;
     }
@@ -930,6 +1012,8 @@ private:
   double px4_command_timeout_sec_{0.5};
   bool print_px4_input_debug_{false};
   double px4_input_debug_interval_sec_{0.2};
+  bool print_teeter_state_debug_{true};
+  double teeter_state_debug_interval_sec_{1.0};
 
   bool has_px4_command_{false};
   double px4_engine_throttle_cmd_{0.0};
@@ -977,6 +1061,16 @@ private:
   bool swap_cyclic_inputs_{false};
   double roll_cyclic_sign_{1.0};
   double pitch_cyclic_sign_{1.0};
+  bool enable_teeter_dynamics_{false};
+  double teeter_inertia_kgm2_{80.0};
+  double teeter_damping_nm_per_rad_s_{600.0};
+  double teeter_stiffness_nm_per_rad_{0.0};
+  double teeter_moment_sign_{1.0};
+  double teeter_rate_limit_deg_s_{180.0};
+  double teeter_angle_rad_{0.0};
+  double teeter_rate_rad_s_{0.0};
+  bool teeter_time_initialized_{false};
+  common::Time last_teeter_update_time_{0};
   double rotor_azimuth_rad_{0.0};
   bool azimuth_time_initialized_{false};
   common::Time last_azimuth_update_time_{0};

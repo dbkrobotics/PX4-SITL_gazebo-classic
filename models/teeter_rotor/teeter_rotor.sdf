@@ -72,7 +72,7 @@
             </ode>
           </contact>
           <friction>
-            <ode/>
+            <ode />
           </friction>
         </surface>
       </collision>
@@ -92,7 +92,7 @@
             </ode>
           </contact>
           <friction>
-            <ode/>
+            <ode />
           </friction>
         </surface>
       </collision>
@@ -112,7 +112,7 @@
             </ode>
           </contact>
           <friction>
-            <ode/>
+            <ode />
           </friction>
         </surface>
       </collision>
@@ -353,7 +353,7 @@
         </geometry>
       </visual>
 
-          <!-- ======================================================= -->
+      <!-- ======================================================= -->
       <!-- Central rotor hub / teeter pivot housing                 -->
       <!-- Hub radius = 0.08, length = 0.25                         -->
       <!-- Hub is lowered so the teeter beams connect to blade root -->
@@ -695,7 +695,7 @@
             </ode>
           </contact>
           <friction>
-            <ode/>
+            <ode />
           </friction>
         </surface>
       </collision>
@@ -857,6 +857,34 @@
       <pitchCyclicSign>1.0</pitchCyclicSign>
 
       <!-- ================================================================== -->
+      <!-- Teeter dynamics                                                     -->
+      <!-- ================================================================== -->
+      <!-- enableTeeterDynamics:
+           true = integrate a simplified teeter/flapping angle in the plugin.
+           Blade lift imbalance creates a moment about the rotor local Y axis,
+           beta is clamped by teeterAngleLimitDeg, and blade forces are applied
+           in the tilted disk frame. This is an intermediate model before
+           adding a full SDF teeter hinge/link stack. -->
+      <enableTeeterDynamics>true</enableTeeterDynamics>
+      <!-- teeterInertiaKgm2:
+           Effective inertia about the teeter hinge. Higher values slow teeter
+           response; lower values make cyclic response sharper. -->
+      <teeterInertiaKgm2>80.0</teeterInertiaKgm2>
+      <!-- teeterDampingNmPerRadS:
+           Hinge/flapping damping. Increase if teeter angle chatters or hits
+           the +/- limit too aggressively. -->
+      <teeterDampingNmPerRadS>600.0</teeterDampingNmPerRadS>
+      <!-- teeterStiffnessNmPerRad:
+           Optional centering stiffness. Real teeter hinges are close to free,
+           so keep this at zero for first bring-up. -->
+      <teeterStiffnessNmPerRad>0.0</teeterStiffnessNmPerRad>
+      <!-- teeterMomentSign:
+           Set to -1.0 if cyclic response is mirrored after enabling teeter
+           dynamics. -->
+      <teeterMomentSign>1.0</teeterMomentSign>
+      <teeterRateLimitDegS>180.0</teeterRateLimitDegS>
+
+      <!-- ================================================================== -->
       <!-- PX4 actuator bridge                                                 -->
       <!-- ================================================================== -->
       <!-- enablePx4ActuatorInput:
@@ -936,7 +964,7 @@
 
            A value of 0.5 means a +/-12 deg cyclic command can create about
            +/-6 deg of effective rotor disk tilt before the max clamp below. -->
-      <cyclicDiskTiltPerDeg>0.5</cyclicDiskTiltPerDeg>
+      <cyclicDiskTiltPerDeg>0.2</cyclicDiskTiltPerDeg>
       <maxCyclicDiskTiltDeg>8.0</maxCyclicDiskTiltDeg>
 
       <!-- px4CommandTimeoutSec:
@@ -949,6 +977,11 @@
            to the Gazebo terminal so QGC stick inputs can be inspected live. -->
       <printPx4InputDebug>false</printPx4InputDebug>
       <px4InputDebugIntervalSec>0.2</px4InputDebugIntervalSec>
+      <!-- Teeter state debug:
+           Prints RPM, blade pitch, teeter angle/rate, lift, and disk force to
+           the Gazebo terminal. -->
+      <printTeeterStateDebug>true</printTeeterStateDebug>
+      <teeterStateDebugIntervalSec>1.0</teeterStateDebugIntervalSec>
 
       <!-- Engine dynamics -->
       <!-- useEngineDynamics:
@@ -980,7 +1013,8 @@
            equivalentShaftHp * propulsiveEfficiency. With 16 hp and 0.85
            efficiency this is about 10.1 kW, or about 440 N*m at 220 rpm. -->
       <engineThrustLbEach>54.0</engineThrustLbEach>
-      <!-- Step 1/2 tuning: increase rotorInertiaKgm2 for slower spool-up, decrease for faster spool-up. -->
+      <!-- Step 1/2 tuning: increase rotorInertiaKgm2 for slower spool-up, decrease for faster
+      spool-up. -->
       <!-- rotorInertiaKgm2:
            Effective rotational inertia of the rotor system.
            Larger value = slower RPM spool-up.
@@ -1190,10 +1224,10 @@
     </joint>
 
     <plugin name="groundtruth_plugin" filename="libgazebo_groundtruth_plugin.so">
-      <robotNamespace/>
+      <robotNamespace />
     </plugin>
     <plugin name="magnetometer_plugin" filename="libgazebo_magnetometer_plugin.so">
-      <robotNamespace/>
+      <robotNamespace />
       <pubRate>100</pubRate>
       <noiseDensity>0.0004</noiseDensity>
       <randomWalk>6.4e-06</randomWalk>
@@ -1201,13 +1235,13 @@
       <magTopic>/mag</magTopic>
     </plugin>
     <plugin name="barometer_plugin" filename="libgazebo_barometer_plugin.so">
-      <robotNamespace/>
+      <robotNamespace />
       <pubRate>50</pubRate>
       <baroTopic>/baro</baroTopic>
       <baroDriftPaPerSec>0</baroDriftPaPerSec>
     </plugin>
     <plugin name="mavlink_interface" filename="libgazebo_mavlink_interface.so">
-      <robotNamespace/>
+      <robotNamespace />
       <imuSubTopic>/imu</imuSubTopic>
       <magSubTopic>/mag</magSubTopic>
       <baroSubTopic>/baro</baroSubTopic>
@@ -1275,7 +1309,7 @@
       </control_channels>
     </plugin>
     <plugin name="rotors_gazebo_imu_plugin" filename="libgazebo_imu_plugin.so">
-      <robotNamespace/>
+      <robotNamespace />
       <linkName>/imu_link</linkName>
       <imuTopic>/imu</imuTopic>
       <gyroscopeNoiseDensity>0.00018665</gyroscopeNoiseDensity>
@@ -1289,4 +1323,5 @@
     </plugin>
 
   </model>
+
 </sdf>
