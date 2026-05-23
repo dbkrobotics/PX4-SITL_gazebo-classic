@@ -13,10 +13,10 @@
 
 namespace gazebo
 {
-class TeeterRotorPlugin : public ModelPlugin
+class RisingStarPlugin : public ModelPlugin
 {
 public:
-  TeeterRotorPlugin() = default;
+  RisingStarPlugin() = default;
 
   void Load(physics::ModelPtr model, sdf::ElementPtr sdf) override
   {
@@ -48,27 +48,27 @@ public:
     this->payload_visual_pub_ = this->node_->Advertise<msgs::Visual>("~/visual", 10);
 
     if (!this->base_link_) {
-      gzerr << "[TeeterRotorPlugin] Base link not found: " << base_link_name << std::endl;
+      gzerr << "[RisingStarPlugin] Base link not found: " << base_link_name << std::endl;
       return;
     }
     if (!this->rotor_link_) {
-      gzerr << "[TeeterRotorPlugin] Rotor link not found: " << rotor_link_name << std::endl;
+      gzerr << "[RisingStarPlugin] Rotor link not found: " << rotor_link_name << std::endl;
       return;
     }
     if (!this->payload_link_) {
-      gzwarn << "[TeeterRotorPlugin] Payload link not found: " << payload_link_name
+      gzwarn << "[RisingStarPlugin] Payload link not found: " << payload_link_name
              << ". Payload parameters will not change model mass/inertia." << std::endl;
     }
     if (!this->blade1_indicator_link_) {
-      gzerr << "[TeeterRotorPlugin] Blade 1 indicator link not found: " << blade1_indicator_link_name << std::endl;
+      gzerr << "[RisingStarPlugin] Blade 1 indicator link not found: " << blade1_indicator_link_name << std::endl;
       return;
     }
     if (!this->blade2_indicator_link_) {
-      gzerr << "[TeeterRotorPlugin] Blade 2 indicator link not found: " << blade2_indicator_link_name << std::endl;
+      gzerr << "[RisingStarPlugin] Blade 2 indicator link not found: " << blade2_indicator_link_name << std::endl;
       return;
     }
     if (!this->joint_) {
-      gzerr << "[TeeterRotorPlugin] Joint not found: " << joint_name << std::endl;
+      gzerr << "[RisingStarPlugin] Joint not found: " << joint_name << std::endl;
       return;
     }
 
@@ -224,9 +224,9 @@ public:
     if (this->enable_px4_actuator_input_) {
       this->px4_motor_speed_sub_ =
         this->node_->Subscribe(this->px4_actuator_topic_,
-          &TeeterRotorPlugin::OnPx4MotorSpeed, this);
+          &RisingStarPlugin::OnPx4MotorSpeed, this);
 
-      std::cout << "[TeeterRotorPlugin] PX4 actuator bridge enabled. Topic: "
+      std::cout << "[RisingStarPlugin] PX4 actuator bridge enabled. Topic: "
                 << this->px4_actuator_topic_
                 << ", input debug: " << (this->print_px4_input_debug_ ? "on" : "off")
                 << ", interval: " << this->px4_input_debug_interval_sec_
@@ -237,7 +237,7 @@ public:
     this->PrintFactSheet();
 
     this->update_connection_ = event::Events::ConnectWorldUpdateBegin(
-      std::bind(&TeeterRotorPlugin::OnUpdate, this));
+      std::bind(&RisingStarPlugin::OnUpdate, this));
   }
 
 private:
@@ -661,7 +661,7 @@ private:
     }
 
     if (_msg->motor_speed_size() < 4) {
-      gzerr << "[TeeterRotorPlugin] PX4 motor_speed message has fewer than 4 channels: "
+      gzerr << "[RisingStarPlugin] PX4 motor_speed message has fewer than 4 channels: "
             << _msg->motor_speed_size() << std::endl;
       return;
     }
@@ -697,7 +697,7 @@ private:
     const double debug_interval = std::max(0.02, this->px4_input_debug_interval_sec_);
     if (this->print_px4_input_debug_ &&
         (this->last_px4_command_time_ - this->last_px4_print_time_).Double() > debug_interval) {
-      std::cout << "[TeeterRotorPlugin][PX4 INPUT] "
+      std::cout << "[RisingStarPlugin][PX4 INPUT] "
                 << "raw=["
                 << _msg->motor_speed(0) << ", "
                 << _msg->motor_speed(1) << ", "
@@ -798,7 +798,7 @@ private:
   void PrintFactSheet() const
   {
     gzmsg << "\n"
-          << "================ Teeter Rotor GP-76 CLEAN ================\n"
+          << "================ Rising Star GP-76 CLEAN ================\n"
           << "Engine dynamics: " << (this->use_engine_dynamics_ ? "on" : "off") << "\n"
           << "Engine radius: " << this->engine_radius_ft_ << " ft\n"
           << "Engine thrust each: " << this->engine_thrust_lb_each_ << " lbf\n"
@@ -973,7 +973,7 @@ private:
       const double net_n = total_lift_n - this->physical_payload_weight_n_
         - this->EmptyWeightNewton();
 
-      std::cout << "[TeeterRotorPlugin] rpm = "
+      std::cout << "[RisingStarPlugin] rpm = "
                 << rpm
                 << ", payload = " << (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0) << " lb"
                 << ", azimuth = " << this->rotor_azimuth_rad_ * 180.0 / M_PI << " deg"
@@ -1160,5 +1160,5 @@ private:
   common::Time last_print_time_{0};
 };
 
-GZ_REGISTER_MODEL_PLUGIN(TeeterRotorPlugin)
+GZ_REGISTER_MODEL_PLUGIN(RisingStarPlugin)
 }

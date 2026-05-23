@@ -1,4 +1,4 @@
-# Teeter Rotor PX4 v1.13 Gazebo Classic Model
+# Rising Star PX4 v1.13 Gazebo Classic Model
 
 ## 1. Project Purpose
 
@@ -25,21 +25,21 @@ This is an engineering/debugging simulation model. It is not yet a high-fidelity
 Use the default model for SITL:
 
 ```sh
-make px4_sitl_default gazebo-classic_teeter_rotor
+make px4_sitl_default gazebo-classic_rising_star
 ```
 
-This uses `models/teeter_rotor/teeter_rotor.sdf`, where serial HITL is disabled.
+This uses `models/rising_star/rising_star.sdf`, where serial HITL is disabled.
 
 Use the separate HITL model when connecting a Pixhawk:
 
 ```sh
 GAZEBO_MODEL_PATH=$PWD/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models \
-gazebo --verbose Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/teeter_rotor_hitl.world
+gazebo --verbose Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/rising_star_hitl.world
 ```
 
-This loads `models/teeter_rotor_hitl/teeter_rotor_hitl.sdf` inside a world with
+This loads `models/rising_star_hitl/rising_star_hitl.sdf` inside a world with
 `ground_plane`, where serial HITL is enabled for the Pixhawk 6X Pro. Pair it
-with the NuttX airframe `4991_teeter_rotor.hil`.
+with the NuttX airframe `4991_rising_star.hil`.
 
 Firmware is split the same way:
 
@@ -48,7 +48,7 @@ make px4_fmu-v6x_default
 make px4_fmu-v6x_hitl
 ```
 
-Use `px4_fmu-v6x_default` for normal Pixhawk 6X Pro hardware firmware. Use `px4_fmu-v6x_hitl` for HITL; it adds the teeter rotor controller and `pwm_out_sim`, while trimming unused fixed-wing, VTOL, gimbal, DDS, and autotune modules to keep flash usage under control.
+Use `px4_fmu-v6x_default` for normal Pixhawk 6X Pro hardware firmware. Use `px4_fmu-v6x_hitl` for HITL; it adds the Rising Star controller and `pwm_out_sim`, while trimming unused fixed-wing, VTOL, gimbal, DDS, and autotune modules to keep flash usage under control.
 
 ---
 
@@ -549,7 +549,7 @@ Manual Gazebo run:
 
 ```bash
 export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models
-export GAZEBO_PLUGIN_PATH=$GAZEBO_PLUGIN_PATH:$(dirname $(find build -name "libteeter_rotor_plugin.so" | head -n 1))
+export GAZEBO_PLUGIN_PATH=$GAZEBO_PLUGIN_PATH:$(dirname $(find build -name "librising_star_plugin.so" | head -n 1))
 
 gazebo --verbose Tools/sitl_gazebo/worlds/empty.world
 ```
@@ -557,7 +557,7 @@ gazebo --verbose Tools/sitl_gazebo/worlds/empty.world
 Insert model:
 
 ```text
-teeter_rotor
+rising_star
 ```
 
 Pixhawk 6X Pro HITL bring-up:
@@ -583,10 +583,10 @@ Use the separate HITL model instead of editing the SITL model:
 
 ```sh
 GAZEBO_MODEL_PATH=$PWD/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models \
-gazebo --verbose Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/teeter_rotor_hitl.world
+gazebo --verbose Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/rising_star_hitl.world
 ```
 
-Adjust `serialDevice` in `models/teeter_rotor_hitl/teeter_rotor_hitl.sdf` if
+Adjust `serialDevice` in `models/rising_star_hitl/rising_star_hitl.sdf` if
 the Pixhawk appears under a different `/dev/serial/by-id/...` path.
 
 Keep motors, ESCs, and servos disconnected for the first HITL run. In HITL,

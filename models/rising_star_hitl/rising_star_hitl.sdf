@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <sdf version="1.6">
-  <model name="teeter_rotor">
+  <model name="rising_star">
     <!-- ====================================================================== -->
     <!-- DOCUMENTATION HEADER                                                    -->
     <!-- ====================================================================== -->
     <!--
-      Teeter Rotor PX4 v1.13 Gazebo Classic model.
+      Rising Star PX4 v1.13 Gazebo Classic model.
 
       Current model features:
         - two large rotor blades
@@ -760,7 +760,7 @@
       rotor_link origin. rotor_link is at z = 0.694 m, so the payload center is
       at z = 0.194 m in model/base coordinates.
 
-      The teeter_rotor_plugin overwrites this link's mass, inertia, collision
+      The rising_star_plugin overwrites this link's mass, inertia, collision
       state, and relative pose from the payload parameters below. The inertial
       values here are the 360 lb default fallback if the plugin is not loaded.
 
@@ -843,7 +843,7 @@
       </axis>
     </joint>
 
-    <plugin name="teeter_rotor_plugin" filename="libteeter_rotor_plugin.so">
+    <plugin name="rising_star_plugin" filename="librising_star_plugin.so">
       <!-- baseLinkName:
            Name of the non-rotating vehicle body link. -->
       <baseLinkName>base_link</baseLinkName>
@@ -980,7 +980,7 @@
 
            The plugin subscribes using Gazebo transport.
       -->
-      <px4ActuatorTopic>~/teeter_rotor/gazebo/command/motor_speed</px4ActuatorTopic>
+      <px4ActuatorTopic>~/rising_star/gazebo/command/motor_speed</px4ActuatorTopic>
 
       <!-- px4InputMode:
            motor_speed = subscribe to mav_msgs::msgs::CommandMotorSpeed.

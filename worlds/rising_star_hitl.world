@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
-  <world name="teeter_rotor_hitl_world">
+  <world name="rising_star_hitl_world">
     <scene>
       <ambient>0.7 0.7 0.7 1</ambient>
       <background>0.7 0.7 0.7 1</background>
@@ -50,7 +50,7 @@
     </physics>
 
     <include>
-      <uri>model://teeter_rotor_hitl</uri>
+      <uri>model://rising_star_hitl</uri>
       <pose>0 0 0 0 0 3.14159265359</pose>
     </include>
   </world>
