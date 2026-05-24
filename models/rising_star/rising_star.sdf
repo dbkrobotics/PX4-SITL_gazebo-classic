@@ -16,7 +16,6 @@
         - tripod mast between base and rotor hub
         - no visible base box
         - 11 degree pre-cone on blades
-        - visual-only blade pitch indicators
 
       This is an intermediate engineering model.
       It is intended for simulation architecture, design iteration, and PX4
@@ -295,14 +294,9 @@
     <!--
       Simplified spinning rotor assembly.
 
-      Contains:
-        - two large blade visuals/collisions
-        - hub / teeter beam placeholder
-        - tip weights
-        - GP-76 engine visual placeholders
-
-      The rotor is still represented as one simplified spinning rigid link.
-      A true teeter hinge / flapping model is future work.
+      Contains the spinning hub and GP-76 engine visual placeholders.
+      The blade visuals/collisions live on teeter_beam_link so they follow
+      the teeter hinge.
     -->
     <link name="rotor_link">
       <pose>0 0 0.694 0 0 0</pose>
@@ -318,47 +312,7 @@
         </inertia>
       </inertial>
 
-      <!-- Two-blade physical/simple rotor visual and collision. -->
-      <collision name="blade_1_collision">
-        <pose>2.2608 0 0.2617 0 -0.191986 0</pose>
-        <geometry>
-          <box>
-            <size>2.7432 0.2667 0.035</size>
-          </box>
-        </geometry>
-      </collision>
-      <visual name="blade_1_visual">
-        <pose>2.2608 0 0.2617 0 -0.191986 0</pose>
-        <geometry>
-          <box>
-            <size>2.7432 0.2667 0.035</size>
-          </box>
-        </geometry>
-      </visual>
-
-      <collision name="blade_2_collision">
-        <pose>-2.2608 0 0.2617 0 -0.191986 3.14159265359</pose>
-        <geometry>
-          <box>
-            <size>2.7432 0.2667 0.035</size>
-          </box>
-        </geometry>
-      </collision>
-      <visual name="blade_2_visual">
-        <pose>-2.2608 0 0.2617 0 -0.191986 3.14159265359</pose>
-        <geometry>
-          <box>
-            <size>2.7432 0.2667 0.035</size>
-          </box>
-        </geometry>
-      </visual>
-
-      <!-- ======================================================= -->
-      <!-- Central rotor hub / teeter pivot housing                 -->
-      <!-- Hub radius = 0.08, length = 0.25                         -->
-      <!-- Hub is lowered so the teeter beams connect to blade root -->
-      <!-- instead of visual pitch indicators.                      -->
-      <!-- ======================================================= -->
+      <!-- Central rotor hub / teeter pivot housing. -->
       <collision name="rotor_hub_collision">
         <pose>0 0 -0.0889 0 0 0</pose>
         <geometry>
@@ -401,16 +355,24 @@
         </material>
       </visual>
 
-      <!-- ======================================================= -->
-      <!-- Two-part teeter beam, attached to actual blade roots     -->
-      <!--                                                         -->
-      <!-- Blade root points from the current blade visuals:        -->
-      <!--   blade 1 root: +0.9144 0 0.0000                         -->
-      <!--   blade 2 root: -0.9144 0 0.0000                         -->
-      <!--                                                         -->
-      <!-- Teeter center pivot: 0 0 -0.1778                         -->
-      <!-- This makes each beam parallel to the 11 deg blade cone.  -->
-      <!-- ======================================================= -->
+    </link>
+
+    <!-- Physical teeter assembly.
+         This link carries the blade visuals/collisions and rocks like a seesaw
+         on a single hinge carried by the spinning rotor hub. -->
+    <link name="teeter_beam_link">
+      <pose>0 0 0.694 0 0 0</pose>
+      <inertial>
+        <mass>8.0</mass>
+        <inertia>
+          <ixx>18.0</ixx>
+          <iyy>18.0</iyy>
+          <izz>35.0</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
 
       <!-- Right teeter beam: center pivot -> blade_1_visual root -->
       <collision name="teeter_beam_right_collision">
@@ -422,7 +384,6 @@
           </cylinder>
         </geometry>
       </collision>
-
       <visual name="teeter_beam_right_visual">
         <pose>0.4572 0 -0.0889 0 1.37881010908 0</pose>
         <geometry>
@@ -447,7 +408,6 @@
           </cylinder>
         </geometry>
       </collision>
-
       <visual name="teeter_beam_left_visual">
         <pose>-0.4572 0 -0.0889 0 -1.37881010908 0</pose>
         <geometry>
@@ -475,7 +435,6 @@
           <diffuse>0.12 0.12 0.12 1</diffuse>
         </material>
       </visual>
-
       <visual name="blade_2_root_clamp_visual">
         <pose>-0.9144 0 0.0000 0 0 0</pose>
         <geometry>
@@ -507,8 +466,7 @@
       </visual>
 
       <!-- Visible GP-76 engine placeholders at 3 ft radius.
-           Engine 1 is at +X, offset +Y; Engine 2 is at -X, offset -Y.
-           These are visual placeholders; drive torque is calculated in plugin. -->
+           These live on teeter_beam_link so the engines follow the blade beam. -->
       <visual name="gp76_engine_1_body_visual">
         <pose>0.9144 0.18 0.03 0 0 0</pose>
         <geometry>
@@ -586,13 +544,21 @@
           <diffuse>0.1 0.1 0.9 0.45</diffuse>
         </material>
       </visual>
+      <gravity>true</gravity>
+      <self_collide>false</self_collide>
     </link>
 
-    <!-- Visual-only pitch indicators. -->
-    <link name="blade_1_pitch_indicator">
-      <pose>0 0 1.17 0 0 0</pose>
+    <!-- Blade pitch links.
+         The plugin places these links from teeter_beam_link each update so
+         visualInspectionBladePitchDeg and actuator pitch are visible on the
+         actual colored blade geometry. These are visual-only because rotor
+         lift is applied by the plugin; collisions here would inject contact
+         forces while the plugin kinematically moves the links. -->
+    <link name="blade_1_pitch_link">
+      <pose>2.2608 0 0.9557 0 -0.191986 0</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
+      <kinematic>true</kinematic>
       <inertial>
         <mass>0.001</mass>
         <inertia>
@@ -604,23 +570,24 @@
           <iyz>0.0</iyz>
         </inertia>
       </inertial>
-      <visual name="blade_1_pitch_indicator_visual">
+      <visual name="blade_1_visual">
         <geometry>
           <box>
-            <size>2.7432 0.36 0.025</size>
+            <size>2.7432 0.2667 0.035</size>
           </box>
         </geometry>
         <material>
-          <ambient>0 0.9 0 1</ambient>
-          <diffuse>0 0.9 0 1</diffuse>
+          <ambient>0.0 0.70 0.15 1</ambient>
+          <diffuse>0.0 0.70 0.15 1</diffuse>
         </material>
       </visual>
     </link>
 
-    <link name="blade_2_pitch_indicator">
-      <pose>0 0 1.17 0 0 0</pose>
+    <link name="blade_2_pitch_link">
+      <pose>-2.2608 0 0.9557 0 -0.191986 3.14159265359</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
+      <kinematic>true</kinematic>
       <inertial>
         <mass>0.001</mass>
         <inertia>
@@ -632,15 +599,15 @@
           <iyz>0.0</iyz>
         </inertia>
       </inertial>
-      <visual name="blade_2_pitch_indicator_visual">
+      <visual name="blade_2_visual">
         <geometry>
           <box>
-            <size>2.7432 0.36 0.025</size>
+            <size>2.7432 0.2667 0.035</size>
           </box>
         </geometry>
         <material>
-          <ambient>0.9 0 0 1</ambient>
-          <diffuse>0.9 0 0 1</diffuse>
+          <ambient>0.85 0.05 0.05 1</ambient>
+          <diffuse>0.85 0.05 0.05 1</diffuse>
         </material>
       </visual>
     </link>
@@ -738,6 +705,26 @@
       </axis>
     </joint>
 
+    <joint name="teeter_hinge_joint" type="revolute">
+      <parent>rotor_link</parent>
+      <child>teeter_beam_link</child>
+      <pose>0 0 0.694 0 0 0</pose>
+      <axis>
+        <!-- Blade span is along rotor local X, so the seesaw hinge axis is Y. -->
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-0.2617993878</lower>
+          <upper>0.2617993878</upper>
+          <effort>10000</effort>
+          <velocity>3.14159265359</velocity>
+        </limit>
+        <dynamics>
+          <damping>600.0</damping>
+          <friction>0.0</friction>
+        </dynamics>
+      </axis>
+    </joint>
+
     <plugin name="rising_star_plugin" filename="librising_star_plugin.so">
       <!-- baseLinkName:
            Name of the non-rotating vehicle body link. -->
@@ -745,14 +732,16 @@
       <!-- rotorLinkName:
            Name of the simplified spinning rotor assembly. -->
       <rotorLinkName>rotor_link</rotorLinkName>
+      <teeterBeamLinkName>teeter_beam_link</teeterBeamLinkName>
+      <blade1PitchLinkName>blade_1_pitch_link</blade1PitchLinkName>
+      <blade2PitchLinkName>blade_2_pitch_link</blade2PitchLinkName>
       <!-- payloadLinkName:
            Physical payload link whose mass/inertia/pose are configured below. -->
       <payloadLinkName>payload_link</payloadLinkName>
-      <blade1IndicatorLinkName>blade_1_pitch_indicator</blade1IndicatorLinkName>
-      <blade2IndicatorLinkName>blade_2_pitch_indicator</blade2IndicatorLinkName>
       <!-- jointName:
            Revolute joint connecting base_link and rotor_link. -->
       <jointName>main_rotor_joint</jointName>
+      <teeterHingeJointName>teeter_hinge_joint</teeterHingeJointName>
 
       <!-- Primary test variables -->
       <!-- targetRpm:
@@ -792,12 +781,12 @@
       <!-- blade1PitchDeg:
            Pitch command for blade 1 in degrees.
            Design/reference value: 7.27 deg. -->
-      <blade1PitchDeg>7.27</blade1PitchDeg>
+      <blade1PitchDeg>5.0</blade1PitchDeg>
       <!-- blade2PitchDeg:
            Pitch command for blade 2 in degrees.
            Equal blade1/blade2 pitch gives mostly symmetric lift.
            Different fixed pitch creates rotating imbalance, not true cyclic control. -->
-      <blade2PitchDeg>7.27</blade2PitchDeg>
+      <blade2PitchDeg>5.0</blade2PitchDeg>
 
       <!-- ================================================================== -->
       <!-- Azimuth-based cyclic pitch                                          -->
@@ -813,7 +802,7 @@
 
            Blade 2 is evaluated 180 degrees away from blade 1.
       -->
-      <useCyclicPitch>true</useCyclicPitch>
+      <useCyclicPitch>false</useCyclicPitch>
 
       <!-- collectiveDeg:
            Mean blade pitch for both blades.
@@ -932,8 +921,6 @@
              actuator[1] -> engine throttle B
              actuator[2] -> blade 1 pitch servo
              actuator[3] -> blade 2 pitch servo
-             actuator[4] -> SITL east cyclic assist
-             actuator[5] -> SITL north cyclic assist
       -->
       <px4InputMode>motor_speed</px4InputMode>
       <px4PitchInputMode>blade_pitch</px4PitchInputMode>
@@ -950,7 +937,7 @@
            If outputs are rad/s-like, tune this value. -->
       <px4MotorSpeedScale>1000.0</px4MotorSpeedScale>
 
-      <!-- Throttle / legacy collective raw mapping:
+      <!-- Throttle raw mapping:
            In HITL, pwm_out_sim publishes normalized actuator_outputs_sim and
            gazebo_mavlink_interface scales them by input_scaling=1000 below.
            Treat 0 as zero command and 1000 as full command. -->
@@ -958,40 +945,6 @@
       <px4ThrottleFullRaw>1000.0</px4ThrottleFullRaw>
       <px4CollectiveZeroRaw>0.0</px4CollectiveZeroRaw>
       <px4CollectiveFullRaw>1000.0</px4CollectiveFullRaw>
-
-      <!-- Legacy collective mapping:
-           normalized actuator[1] = 0 -> minCollectiveCmdDeg
-           normalized actuator[1] = 1 -> maxCollectiveCmdDeg
-
-           In blade_pitch mode actuator[1] is engine throttle B instead. -->
-      <minCollectiveCmdDeg>2.0</minCollectiveCmdDeg>
-      <maxCollectiveCmdDeg>12.0</maxCollectiveCmdDeg>
-
-      <!-- Legacy cyclic mapping:
-           actuator[2], actuator[3] are mapped from 0..1 to -maxCyclicDeg..+maxCyclicDeg.
-           Example:
-             normalized 0.5 -> 0 deg cyclic
-             normalized 1.0 -> +maxCyclicDeg
-             normalized 0.0 -> -maxCyclicDeg
-
-           In blade_pitch mode actuator[2]/[3] are direct blade pitch servos. -->
-      <maxCyclicDeg>12.0</maxCyclicDeg>
-
-      <!-- cyclicMomentPerDegNm:
-           Optional bring-up assist moment applied to base_link from PX4 cyclic
-           commands. Keep this at 0 for physical cyclic-pitch-only control. -->
-      <cyclicMomentPerDegNm>0.0</cyclicMomentPerDegNm>
-
-      <!-- cyclicDiskTiltPerDeg:
-           Physical cyclic authority approximation. Tilt the effective rotor
-           thrust vector by this many disk degrees per commanded cyclic degree:
-
-             lateral_force = total_rotor_lift * tan(disk_tilt)
-
-           A value of 0.5 means a +/-12 deg cyclic command can create about
-           +/-6 deg of effective rotor disk tilt before the max clamp below. -->
-      <cyclicDiskTiltPerDeg>0.2</cyclicDiskTiltPerDeg>
-      <maxCyclicDiskTiltDeg>8.0</maxCyclicDiskTiltDeg>
 
       <!-- px4CommandTimeoutSec:
            If no PX4 actuator message is received for this many seconds,
@@ -1004,7 +957,7 @@
       <printPx4InputDebug>false</printPx4InputDebug>
       <px4InputDebugIntervalSec>0.2</px4InputDebugIntervalSec>
       <!-- Teeter state debug:
-           Prints RPM, blade pitch, teeter angle/rate, lift, and disk force to
+           Prints RPM, blade pitch, teeter angle/rate, and lift to
            the Gazebo terminal. -->
       <printTeeterStateDebug>true</printTeeterStateDebug>
       <teeterStateDebugIntervalSec>1.0</teeterStateDebugIntervalSec>
@@ -1064,23 +1017,18 @@
              kTorque = 440.6 / 23.038^2 ≈ 0.831 -->
       <kTorque>0.831</kTorque>
 
-      <!-- Visual-only pitch indicators -->
-      <!-- showPitchIndicators:
-           Enables green/red visual-only blade pitch plates. -->
-      <showPitchIndicators>true</showPitchIndicators>
-      <!-- animatePitchIndicators:
-           If true, visual pitch indicators oscillate so pitch motion is easy to see.
-           This is visual-only and does not change lift calculation. -->
-      <animatePitchIndicators>false</animatePitchIndicators>
-      <!-- pitchIndicatorAnimationAmplitudeDeg:
-           Visual-only pitch animation amplitude in degrees. -->
-      <pitchIndicatorAnimationAmplitudeDeg>5.0</pitchIndicatorAnimationAmplitudeDeg>
-      <!-- pitchIndicatorAnimationFrequencyHz:
-           Visual-only pitch animation frequency in Hz. -->
-      <pitchIndicatorAnimationFrequencyHz>0.25</pitchIndicatorAnimationFrequencyHz>
-      <!-- pitchIndicatorVerticalOffsetM:
-           Raises the pitch indicators above the blades for visibility. -->
-      <pitchIndicatorVerticalOffsetM>0.18</pitchIndicatorVerticalOffsetM>
+      <!-- Visual inspection mode:
+           true = ignore PX4 actuator input and hold the commanded inspection
+             blade pitch, rotor azimuth, and teeter angle for Gazebo viewing.
+           Set this back to false before flight-control tests. -->
+      <visualInspectionMode>false</visualInspectionMode>
+      <visualInspectionBladePitchDeg>20.0</visualInspectionBladePitchDeg>
+      <visualInspectionRotorAzimuthDeg>0.0</visualInspectionRotorAzimuthDeg>
+      <visualInspectionTeeterDeg>0.0</visualInspectionTeeterDeg>
+      <!-- true = use the visual-only blade pitch links during flight so the
+           colored blades show the commanded pitch angle. These links have no
+           collision, and rotor lift is still applied by the plugin. -->
+      <updateBladePitchVisualsDuringFlight>true</updateBladePitchVisualsDuringFlight>
 
       <!-- Fixed constants -->
       <!-- emptyWeightLb:
@@ -1308,7 +1256,7 @@
           <zero_position_armed>0</zero_position_armed>
           <joint_control_type>velocity</joint_control_type>
         </channel>
-        <channel name="collective">
+        <channel name="engine_throttle_b">
           <input_index>1</input_index>
           <input_offset>0</input_offset>
           <input_scaling>1000</input_scaling>
@@ -1316,7 +1264,7 @@
           <zero_position_armed>0</zero_position_armed>
           <joint_control_type>velocity</joint_control_type>
         </channel>
-        <channel name="roll_cyclic">
+        <channel name="blade_1_pitch_servo">
           <input_index>2</input_index>
           <input_offset>1</input_offset>
           <input_scaling>500</input_scaling>
@@ -1324,24 +1272,8 @@
           <zero_position_armed>0</zero_position_armed>
           <joint_control_type>velocity</joint_control_type>
         </channel>
-        <channel name="pitch_cyclic">
+        <channel name="blade_2_pitch_servo">
           <input_index>3</input_index>
-          <input_offset>1</input_offset>
-          <input_scaling>500</input_scaling>
-          <zero_position_disarmed>0</zero_position_disarmed>
-          <zero_position_armed>0</zero_position_armed>
-          <joint_control_type>velocity</joint_control_type>
-        </channel>
-        <channel name="sitl_east_cyclic_assist">
-          <input_index>4</input_index>
-          <input_offset>1</input_offset>
-          <input_scaling>500</input_scaling>
-          <zero_position_disarmed>0</zero_position_disarmed>
-          <zero_position_armed>0</zero_position_armed>
-          <joint_control_type>velocity</joint_control_type>
-        </channel>
-        <channel name="sitl_north_cyclic_assist">
-          <input_index>5</input_index>
           <input_offset>1</input_offset>
           <input_scaling>500</input_scaling>
           <zero_position_disarmed>0</zero_position_disarmed>

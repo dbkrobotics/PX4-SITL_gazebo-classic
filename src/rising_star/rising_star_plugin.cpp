@@ -24,24 +24,30 @@ public:
 
     std::string base_link_name = "base_link";
     std::string rotor_link_name = "rotor_link";
+    std::string teeter_beam_link_name = "teeter_beam_link";
+    std::string blade1_pitch_link_name = "blade_1_pitch_link";
+    std::string blade2_pitch_link_name = "blade_2_pitch_link";
     std::string payload_link_name = "payload_link";
-    std::string blade1_indicator_link_name = "blade_1_pitch_indicator";
-    std::string blade2_indicator_link_name = "blade_2_pitch_indicator";
     std::string joint_name = "main_rotor_joint";
+    std::string teeter_hinge_joint_name = "teeter_hinge_joint";
 
     this->ReadString(sdf, "baseLinkName", base_link_name);
     this->ReadString(sdf, "rotorLinkName", rotor_link_name);
+    this->ReadString(sdf, "teeterBeamLinkName", teeter_beam_link_name);
+    this->ReadString(sdf, "blade1PitchLinkName", blade1_pitch_link_name);
+    this->ReadString(sdf, "blade2PitchLinkName", blade2_pitch_link_name);
     this->ReadString(sdf, "payloadLinkName", payload_link_name);
-    this->ReadString(sdf, "blade1IndicatorLinkName", blade1_indicator_link_name);
-    this->ReadString(sdf, "blade2IndicatorLinkName", blade2_indicator_link_name);
     this->ReadString(sdf, "jointName", joint_name);
+    this->ReadString(sdf, "teeterHingeJointName", teeter_hinge_joint_name);
 
     this->base_link_ = this->model_->GetLink(base_link_name);
     this->rotor_link_ = this->model_->GetLink(rotor_link_name);
+    this->teeter_beam_link_ = this->model_->GetLink(teeter_beam_link_name);
+    this->blade1_pitch_link_ = this->model_->GetLink(blade1_pitch_link_name);
+    this->blade2_pitch_link_ = this->model_->GetLink(blade2_pitch_link_name);
     this->payload_link_ = this->model_->GetLink(payload_link_name);
-    this->blade1_indicator_link_ = this->model_->GetLink(blade1_indicator_link_name);
-    this->blade2_indicator_link_ = this->model_->GetLink(blade2_indicator_link_name);
     this->joint_ = this->model_->GetJoint(joint_name);
+    this->teeter_hinge_joint_ = this->model_->GetJoint(teeter_hinge_joint_name);
 
     this->node_.reset(new transport::Node());
     this->node_->Init(this->model_->GetWorld()->Name());
@@ -55,20 +61,28 @@ public:
       gzerr << "[RisingStarPlugin] Rotor link not found: " << rotor_link_name << std::endl;
       return;
     }
+    if (!this->teeter_beam_link_) {
+      gzerr << "[RisingStarPlugin] Teeter beam link not found: " << teeter_beam_link_name << std::endl;
+      return;
+    }
+    if (!this->blade1_pitch_link_) {
+      gzerr << "[RisingStarPlugin] Blade 1 pitch link not found: " << blade1_pitch_link_name << std::endl;
+      return;
+    }
+    if (!this->blade2_pitch_link_) {
+      gzerr << "[RisingStarPlugin] Blade 2 pitch link not found: " << blade2_pitch_link_name << std::endl;
+      return;
+    }
     if (!this->payload_link_) {
       gzwarn << "[RisingStarPlugin] Payload link not found: " << payload_link_name
              << ". Payload parameters will not change model mass/inertia." << std::endl;
     }
-    if (!this->blade1_indicator_link_) {
-      gzerr << "[RisingStarPlugin] Blade 1 indicator link not found: " << blade1_indicator_link_name << std::endl;
-      return;
-    }
-    if (!this->blade2_indicator_link_) {
-      gzerr << "[RisingStarPlugin] Blade 2 indicator link not found: " << blade2_indicator_link_name << std::endl;
-      return;
-    }
     if (!this->joint_) {
       gzerr << "[RisingStarPlugin] Joint not found: " << joint_name << std::endl;
+      return;
+    }
+    if (!this->teeter_hinge_joint_) {
+      gzerr << "[RisingStarPlugin] Teeter hinge joint not found: " << teeter_hinge_joint_name << std::endl;
       return;
     }
 
@@ -117,14 +131,17 @@ public:
     this->ReadDouble(sdf, "minCollectiveCmdDeg", this->min_collective_cmd_deg_);
     this->ReadDouble(sdf, "maxCollectiveCmdDeg", this->max_collective_cmd_deg_);
     this->ReadDouble(sdf, "maxCyclicDeg", this->max_cyclic_deg_);
-    this->ReadDouble(sdf, "cyclicMomentPerDegNm", this->cyclic_moment_per_deg_nm_);
-    this->ReadDouble(sdf, "cyclicDiskTiltPerDeg", this->cyclic_disk_tilt_per_deg_);
-    this->ReadDouble(sdf, "maxCyclicDiskTiltDeg", this->max_cyclic_disk_tilt_deg_);
     this->ReadDouble(sdf, "px4CommandTimeoutSec", this->px4_command_timeout_sec_);
     this->ReadBool(sdf, "printPx4InputDebug", this->print_px4_input_debug_);
     this->ReadDouble(sdf, "px4InputDebugIntervalSec", this->px4_input_debug_interval_sec_);
     this->ReadBool(sdf, "printTeeterStateDebug", this->print_teeter_state_debug_);
     this->ReadDouble(sdf, "teeterStateDebugIntervalSec", this->teeter_state_debug_interval_sec_);
+
+    this->ReadBool(sdf, "visualInspectionMode", this->visual_inspection_mode_);
+    this->ReadDouble(sdf, "visualInspectionBladePitchDeg", this->visual_inspection_blade_pitch_deg_);
+    this->ReadDouble(sdf, "visualInspectionRotorAzimuthDeg", this->visual_inspection_rotor_azimuth_deg_);
+    this->ReadDouble(sdf, "visualInspectionTeeterDeg", this->visual_inspection_teeter_deg_);
+    this->ReadBool(sdf, "updateBladePitchVisualsDuringFlight", this->update_blade_pitch_visuals_during_flight_);
 
     // Engine dynamics.
     this->ReadBool(sdf, "useEngineDynamics", this->use_engine_dynamics_);
@@ -133,13 +150,6 @@ public:
     this->ReadDouble(sdf, "engineThrustLbEach", this->engine_thrust_lb_each_);
     this->ReadDouble(sdf, "rotorInertiaKgm2", this->rotor_inertia_kgm2_);
     this->ReadDouble(sdf, "kTorque", this->k_torque_);
-
-    // Visual indicators.
-    this->ReadBool(sdf, "showPitchIndicators", this->show_pitch_indicators_);
-    this->ReadBool(sdf, "animatePitchIndicators", this->animate_pitch_indicators_);
-    this->ReadDouble(sdf, "pitchIndicatorAnimationAmplitudeDeg", this->pitch_indicator_animation_amplitude_deg_);
-    this->ReadDouble(sdf, "pitchIndicatorAnimationFrequencyHz", this->pitch_indicator_animation_frequency_hz_);
-    this->ReadDouble(sdf, "pitchIndicatorVerticalOffsetM", this->pitch_indicator_vertical_offset_m_);
 
     // Fixed constants.
     this->ReadDouble(sdf, "emptyWeightLb", this->empty_weight_lb_);
@@ -226,7 +236,7 @@ public:
 
     this->ConfigurePayloadLink();
 
-    if (this->enable_px4_actuator_input_) {
+    if (this->enable_px4_actuator_input_ && !this->visual_inspection_mode_) {
       this->px4_motor_speed_sub_ =
         this->node_->Subscribe(this->px4_actuator_topic_,
           &RisingStarPlugin::OnPx4MotorSpeed, this);
@@ -343,6 +353,64 @@ private:
     this->payload_visual_pub_->Publish(visual_msg);
   }
 
+  void SetVisualVisible(physics::LinkPtr link, const std::string &visual_name, bool visible)
+  {
+    if (!this->payload_visual_pub_ || !link) {
+      return;
+    }
+
+    msgs::Visual visual_msg;
+    visual_msg.set_name(link->GetScopedName() + "::" + visual_name);
+    visual_msg.set_parent_name(link->GetScopedName());
+    visual_msg.set_visible(visible);
+    visual_msg.set_transparency(visible ? 0.0 : 1.0);
+    this->payload_visual_pub_->Publish(visual_msg);
+  }
+
+  void UpdateBladeVisualMode()
+  {
+    const bool pitch_link_visible =
+      this->visual_inspection_mode_ || this->update_blade_pitch_visuals_during_flight_;
+    const bool fixed_blade_visible = !pitch_link_visible;
+
+    this->SetVisualVisible(this->teeter_beam_link_, "blade_1_visual", fixed_blade_visible);
+    this->SetVisualVisible(this->teeter_beam_link_, "blade_2_visual", fixed_blade_visible);
+    this->SetVisualVisible(this->blade1_pitch_link_, "blade_1_visual", pitch_link_visible);
+    this->SetVisualVisible(this->blade2_pitch_link_, "blade_2_visual", pitch_link_visible);
+  }
+
+  void SetBladeVisualPitch(double blade1_pitch_deg, double blade2_pitch_deg)
+  {
+    if (!this->teeter_beam_link_ || !this->blade1_pitch_link_ || !this->blade2_pitch_link_) {
+      return;
+    }
+
+    const double blade1_pitch_rad = DegToRad(blade1_pitch_deg);
+    const double blade2_pitch_rad = DegToRad(blade2_pitch_deg);
+
+#if GAZEBO_MAJOR_VERSION >= 8
+    const ignition::math::Pose3d teeter_pose = this->teeter_beam_link_->WorldPose();
+    const ignition::math::Pose3d blade1_pose(
+      ignition::math::Vector3d(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_),
+      ignition::math::Quaterniond(blade1_pitch_rad, -this->pre_cone_rad_, 0.0));
+    const ignition::math::Pose3d blade2_pose(
+      ignition::math::Vector3d(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_),
+      ignition::math::Quaterniond(blade2_pitch_rad, -this->pre_cone_rad_, M_PI));
+    this->blade1_pitch_link_->SetWorldPose(teeter_pose * blade1_pose);
+    this->blade2_pitch_link_->SetWorldPose(teeter_pose * blade2_pose);
+#else
+    const gazebo::math::Pose teeter_pose = this->teeter_beam_link_->GetWorldPose();
+    const gazebo::math::Pose blade1_pose(
+      gazebo::math::Vector3(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_),
+      gazebo::math::Quaternion(blade1_pitch_rad, -this->pre_cone_rad_, 0.0));
+    const gazebo::math::Pose blade2_pose(
+      gazebo::math::Vector3(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_),
+      gazebo::math::Quaternion(blade2_pitch_rad, -this->pre_cone_rad_, M_PI));
+    this->blade1_pitch_link_->SetWorldPose(teeter_pose + blade1_pose);
+    this->blade2_pitch_link_->SetWorldPose(teeter_pose + blade2_pose);
+#endif
+  }
+
   double PitchFactor(double pitch_deg) const
   {
     const double pitch = std::max(this->min_pitch_deg_, std::min(pitch_deg, this->max_pitch_deg_));
@@ -448,73 +516,6 @@ private:
     this->rotor_omega_ = std::max(0.0, std::min(this->rotor_omega_, this->max_omega_));
 
     return this->rotor_omega_;
-  }
-
-  double Blade1VisualPitchDeg(double t) const
-  {
-    double b1 = this->blade1_pitch_deg_;
-    double b2 = this->blade2_pitch_deg_;
-    this->CurrentBladePitchesDeg(b1, b2);
-
-    if (!this->animate_pitch_indicators_) {
-      return b1;
-    }
-
-    const double phase = 2.0 * M_PI * this->pitch_indicator_animation_frequency_hz_ * t;
-    return b1 + this->pitch_indicator_animation_amplitude_deg_ * std::sin(phase);
-  }
-
-  double Blade2VisualPitchDeg(double t) const
-  {
-    double b1 = this->blade1_pitch_deg_;
-    double b2 = this->blade2_pitch_deg_;
-    this->CurrentBladePitchesDeg(b1, b2);
-
-    if (!this->animate_pitch_indicators_) {
-      return b2;
-    }
-
-    const double phase = 2.0 * M_PI * this->pitch_indicator_animation_frequency_hz_ * t;
-    return b2 + this->pitch_indicator_animation_amplitude_deg_ * std::sin(phase + M_PI);
-  }
-
-  void UpdatePitchIndicators(double t)
-  {
-    if (!this->show_pitch_indicators_) {
-      return;
-    }
-
-#if GAZEBO_MAJOR_VERSION >= 8
-    const ignition::math::Pose3d rotor_pose = this->rotor_link_->WorldPose();
-    const double blade1_pitch_rad = DegToRad(this->ClampPitchDeg(this->Blade1VisualPitchDeg(t)));
-    const double blade2_pitch_rad = DegToRad(this->ClampPitchDeg(this->Blade2VisualPitchDeg(t)));
-
-    ignition::math::Pose3d blade1_local_pose(
-      ignition::math::Vector3d(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_ + this->pitch_indicator_vertical_offset_m_),
-      ignition::math::Quaterniond(blade1_pitch_rad, -this->pre_cone_rad_, 0.0));
-
-    ignition::math::Pose3d blade2_local_pose(
-      ignition::math::Vector3d(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_ + this->pitch_indicator_vertical_offset_m_),
-      ignition::math::Quaterniond(blade2_pitch_rad, -this->pre_cone_rad_, M_PI));
-
-    this->blade1_indicator_link_->SetWorldPose(rotor_pose * blade1_local_pose);
-    this->blade2_indicator_link_->SetWorldPose(rotor_pose * blade2_local_pose);
-#else
-    const gazebo::math::Pose rotor_pose = this->rotor_link_->GetWorldPose();
-    const double blade1_pitch_rad = DegToRad(this->ClampPitchDeg(this->Blade1VisualPitchDeg(t)));
-    const double blade2_pitch_rad = DegToRad(this->ClampPitchDeg(this->Blade2VisualPitchDeg(t)));
-
-    gazebo::math::Pose blade1_local_pose(
-      gazebo::math::Vector3(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_ + this->pitch_indicator_vertical_offset_m_),
-      gazebo::math::Quaternion(blade1_pitch_rad, -this->pre_cone_rad_, 0.0));
-
-    gazebo::math::Pose blade2_local_pose(
-      gazebo::math::Vector3(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_ + this->pitch_indicator_vertical_offset_m_),
-      gazebo::math::Quaternion(blade2_pitch_rad, -this->pre_cone_rad_, M_PI));
-
-    this->blade1_indicator_link_->SetWorldPose(rotor_pose + blade1_local_pose);
-    this->blade2_indicator_link_->SetWorldPose(rotor_pose + blade2_local_pose);
-#endif
   }
 
 
@@ -663,6 +664,19 @@ private:
     return this->teeter_angle_rad_;
   }
 
+  double TeeterHingeAngleRad() const
+  {
+    if (!this->teeter_hinge_joint_) {
+      return 0.0;
+    }
+
+#if GAZEBO_MAJOR_VERSION >= 8
+    return this->teeter_hinge_joint_->Position(0);
+#else
+    return this->teeter_hinge_joint_->GetAngle(0).Radian();
+#endif
+  }
+
 
   double Clamp01(double value) const
   {
@@ -715,10 +729,6 @@ private:
       this->NormalizePx4MotorSpeed(_msg->motor_speed(2));
     const double ch3 = all_outputs_zero ? (direct_blade_pitch ? 0.0 : 0.5) :
       this->NormalizePx4MotorSpeed(_msg->motor_speed(3));
-    const double ch4 = (direct_blade_pitch && _msg->motor_speed_size() > 4 && !all_outputs_zero) ?
-      this->NormalizePx4MotorSpeed(_msg->motor_speed(4)) : 0.5;
-    const double ch5 = (direct_blade_pitch && _msg->motor_speed_size() > 5 && !all_outputs_zero) ?
-      this->NormalizePx4MotorSpeed(_msg->motor_speed(5)) : 0.5;
 
     this->px4_engine_throttle_cmd_ = this->ClampEngineThrottle(direct_blade_pitch ? 0.5 * (ch0 + ch1) : ch0);
 
@@ -729,10 +739,8 @@ private:
         this->min_pitch_deg_ + ch3 * (this->max_pitch_deg_ - this->min_pitch_deg_);
       this->px4_collective_deg_cmd_ = 0.5 *
         (this->px4_blade1_pitch_deg_cmd_ + this->px4_blade2_pitch_deg_cmd_);
-      this->px4_roll_cyclic_deg_cmd_ =
-        this->Map01ToSigned(ch4, this->max_cyclic_deg_);
-      this->px4_pitch_cyclic_deg_cmd_ =
-        this->Map01ToSigned(ch5, this->max_cyclic_deg_);
+      this->px4_roll_cyclic_deg_cmd_ = 0.0;
+      this->px4_pitch_cyclic_deg_cmd_ = 0.0;
 
     } else {
       this->px4_collective_deg_cmd_ =
@@ -760,18 +768,14 @@ private:
                 << ch0 << ", "
                 << ch1 << ", "
                 << ch2 << ", "
-                << ch3 << ", "
-                << ch4 << ", "
-                << ch5 << "] "
+                << ch3 << "] "
                 << "cmd={"
                 << "throttle:" << this->px4_engine_throttle_cmd_
                 << ", pitch_mode:" << this->px4_pitch_input_mode_;
 
       if (direct_blade_pitch) {
         std::cout << ", blade_pitch_deg:[" << this->px4_blade1_pitch_deg_cmd_
-                  << ", " << this->px4_blade2_pitch_deg_cmd_ << "]"
-                  << ", cyclic_assist_deg:[" << this->px4_roll_cyclic_deg_cmd_
-                  << ", " << this->px4_pitch_cyclic_deg_cmd_ << "]";
+                  << ", " << this->px4_blade2_pitch_deg_cmd_ << "]";
 
       } else {
         std::cout << ", collective_deg:" << this->px4_collective_deg_cmd_
@@ -798,6 +802,17 @@ private:
 
   void ApplyPx4CommandsIfActive(const common::Time &now)
   {
+    if (this->visual_inspection_mode_) {
+      this->engine_throttle_ = 0.0;
+      this->collective_deg_ = this->ClampPitchDeg(this->visual_inspection_blade_pitch_deg_);
+      this->blade1_pitch_deg_ = this->collective_deg_;
+      this->blade2_pitch_deg_ = this->collective_deg_;
+      this->roll_cyclic_deg_ = 0.0;
+      this->pitch_cyclic_deg_ = 0.0;
+      this->use_cyclic_pitch_ = false;
+      return;
+    }
+
     if (!this->Px4CommandActive(now)) {
       if (this->enable_px4_actuator_input_) {
         this->engine_throttle_ = 0.0;
@@ -806,8 +821,6 @@ private:
         this->blade2_pitch_deg_ = this->min_pitch_deg_;
         this->roll_cyclic_deg_ = 0.0;
         this->pitch_cyclic_deg_ = 0.0;
-        this->cyclic_world_north_deg_ = 0.0;
-        this->cyclic_world_east_deg_ = 0.0;
         this->use_cyclic_pitch_ = this->px4_pitch_input_mode_ != "blade_pitch";
       }
       return;
@@ -820,8 +833,6 @@ private:
       this->collective_deg_ = this->ClampPitchDeg(0.5 * (this->blade1_pitch_deg_ + this->blade2_pitch_deg_));
       this->roll_cyclic_deg_ = 0.0;
       this->pitch_cyclic_deg_ = 0.0;
-      this->cyclic_world_east_deg_ = this->px4_roll_cyclic_deg_cmd_;
-      this->cyclic_world_north_deg_ = this->px4_pitch_cyclic_deg_cmd_;
       this->use_cyclic_pitch_ = false;
       return;
     }
@@ -837,8 +848,6 @@ private:
     pitch_cyclic_cmd *= this->pitch_cyclic_sign_ >= 0.0 ? 1.0 : -1.0;
 
     if (this->cyclic_command_frame_ == "world") {
-      this->cyclic_world_north_deg_ = pitch_cyclic_cmd;
-      this->cyclic_world_east_deg_ = roll_cyclic_cmd;
 #if GAZEBO_MAJOR_VERSION >= 8
       const ignition::math::Pose3d base_pose = this->base_link_->WorldPose();
       const ignition::math::Vector3d cyclic_world(roll_cyclic_cmd, pitch_cyclic_cmd, 0.0);
@@ -851,20 +860,6 @@ private:
       const gazebo::math::Vector3 cyclic_body = base_pose.rot.RotateVectorReverse(cyclic_world);
       pitch_cyclic_cmd = cyclic_body.x;
       roll_cyclic_cmd = cyclic_body.y;
-#endif
-    } else {
-#if GAZEBO_MAJOR_VERSION >= 8
-      const ignition::math::Pose3d base_pose = this->base_link_->WorldPose();
-      const ignition::math::Vector3d cyclic_body(pitch_cyclic_cmd, roll_cyclic_cmd, 0.0);
-      const ignition::math::Vector3d cyclic_world = base_pose.Rot().RotateVector(cyclic_body);
-      this->cyclic_world_east_deg_ = cyclic_world.X();
-      this->cyclic_world_north_deg_ = cyclic_world.Y();
-#else
-      const gazebo::math::Pose base_pose = this->base_link_->GetWorldPose();
-      const gazebo::math::Vector3 cyclic_body(pitch_cyclic_cmd, roll_cyclic_cmd, 0.0);
-      const gazebo::math::Vector3 cyclic_world = base_pose.rot.RotateVector(cyclic_body);
-      this->cyclic_world_east_deg_ = cyclic_world.x;
-      this->cyclic_world_north_deg_ = cyclic_world.y;
 #endif
     }
 
@@ -924,30 +919,49 @@ private:
           << "PX4 bridge: " << (this->enable_px4_actuator_input_ ? "on" : "off")
           << ", topic: " << this->px4_actuator_topic_
           << ", scale: " << this->px4_motor_speed_scale_ << "\n"
-          << "PX4 mapping: ch0 throttle, ch1 collective, ch2 roll cyclic, ch3 pitch cyclic\n"
-          << "Cyclic moment assist: " << this->cyclic_moment_per_deg_nm_ << " N*m/deg\n"
-          << "Cyclic disk tilt force: " << this->cyclic_disk_tilt_per_deg_
-          << " disk-deg/cyclic-deg, max " << this->max_cyclic_disk_tilt_deg_ << " deg\n"
+          << "Visual inspection mode: " << (this->visual_inspection_mode_ ? "on" : "off")
+          << ", blade pitch: " << this->visual_inspection_blade_pitch_deg_
+          << " deg, rotor azimuth: " << this->visual_inspection_rotor_azimuth_deg_
+          << " deg, teeter: " << this->visual_inspection_teeter_deg_
+          << " deg, blade visual flight update: "
+          << (this->update_blade_pitch_visuals_during_flight_ ? "on" : "off") << "\n"
+          << "PX4 mapping: ch0 engine A, ch1 engine B, ch2 blade 1 pitch, ch3 blade 2 pitch\n"
           << "==========================================================\n"
           << std::endl;
   }
 
   void OnUpdate()
   {
-    if (!this->base_link_ || !this->rotor_link_ || !this->blade1_indicator_link_ ||
-        !this->blade2_indicator_link_ || !this->joint_) {
+    if (!this->base_link_ || !this->rotor_link_ || !this->teeter_beam_link_ ||
+        !this->joint_ || !this->teeter_hinge_joint_) {
       return;
     }
 
     const common::Time now = this->model_->GetWorld()->SimTime();
-    const bool px4_command_active = this->Px4CommandActive(now);
+    this->UpdateBladeVisualMode();
     this->ApplyPx4CommandsIfActive(now);
-    const double omega_cmd = this->StepRotorOmega(now);
-    this->StepRotorAzimuth(now, omega_cmd);
+    const double omega_cmd = this->visual_inspection_mode_ ? 0.0 : this->StepRotorOmega(now);
+
+    if (this->visual_inspection_mode_) {
+      this->rotor_azimuth_rad_ = DegToRad(this->visual_inspection_rotor_azimuth_deg_);
+#if GAZEBO_MAJOR_VERSION >= 6
+      this->joint_->SetPosition(0, this->rotor_azimuth_rad_);
+      this->teeter_hinge_joint_->SetPosition(0, DegToRad(this->visual_inspection_teeter_deg_));
+#else
+      this->joint_->SetAngle(0, this->rotor_azimuth_rad_);
+      this->teeter_hinge_joint_->SetAngle(0, DegToRad(this->visual_inspection_teeter_deg_));
+#endif
+    } else {
+      this->StepRotorAzimuth(now, omega_cmd);
+    }
 
     double blade1_pitch_cmd_deg = this->blade1_pitch_deg_;
     double blade2_pitch_cmd_deg = this->blade2_pitch_deg_;
     this->CurrentBladePitchesDeg(blade1_pitch_cmd_deg, blade2_pitch_cmd_deg);
+
+    if (this->visual_inspection_mode_ || this->update_blade_pitch_visuals_during_flight_) {
+      this->SetBladeVisualPitch(blade1_pitch_cmd_deg, blade2_pitch_cmd_deg);
+    }
 
 #if GAZEBO_MAJOR_VERSION >= 8
     ignition::math::Vector3d angular_vel(0.0, 0.0, omega_cmd);
@@ -956,25 +970,23 @@ private:
 #endif
 
     this->rotor_link_->SetAngularVel(angular_vel);
-    this->UpdatePitchIndicators(now.Double());
-
     const double blade1_lift_n = this->BladeLiftNewton(omega_cmd, blade1_pitch_cmd_deg);
     const double blade2_lift_n = this->BladeLiftNewton(omega_cmd, blade2_pitch_cmd_deg);
     const double total_lift_n = blade1_lift_n + blade2_lift_n;
-    const double teeter_angle_rad = this->StepTeeterAngle(now, blade1_lift_n, blade2_lift_n);
+    this->teeter_angle_rad_ = this->TeeterHingeAngleRad();
+    this->teeter_rate_rad_s_ = this->teeter_hinge_joint_->GetVelocity(0);
 
 #if GAZEBO_MAJOR_VERSION >= 8
-    const ignition::math::Pose3d rotor_pose = this->rotor_link_->WorldPose();
-    const ignition::math::Quaterniond teeter_rotation(0.0, teeter_angle_rad, 0.0);
-    const ignition::math::Quaterniond rotor_disk_to_world = rotor_pose.Rot() * teeter_rotation;
+    const ignition::math::Pose3d teeter_pose = this->teeter_beam_link_->WorldPose();
+    const ignition::math::Quaterniond rotor_disk_to_world = teeter_pose.Rot();
 
     const ignition::math::Vector3d blade1_local(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
     const ignition::math::Vector3d blade2_local(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
 
     const ignition::math::Vector3d blade1_pos_world =
-      rotor_pose.Pos() + rotor_disk_to_world.RotateVector(blade1_local);
+      teeter_pose.Pos() + rotor_disk_to_world.RotateVector(blade1_local);
     const ignition::math::Vector3d blade2_pos_world =
-      rotor_pose.Pos() + rotor_disk_to_world.RotateVector(blade2_local);
+      teeter_pose.Pos() + rotor_disk_to_world.RotateVector(blade2_local);
 
     const ignition::math::Vector3d blade1_force_world =
       rotor_disk_to_world.RotateVector(ignition::math::Vector3d(0.0, 0.0, blade1_lift_n));
@@ -982,17 +994,16 @@ private:
       rotor_disk_to_world.RotateVector(ignition::math::Vector3d(0.0, 0.0, blade2_lift_n));
 
 #else
-    const gazebo::math::Pose rotor_pose = this->rotor_link_->GetWorldPose();
-    const gazebo::math::Quaternion teeter_rotation(0.0, teeter_angle_rad, 0.0);
-    const gazebo::math::Quaternion rotor_disk_to_world = rotor_pose.rot * teeter_rotation;
+    const gazebo::math::Pose teeter_pose = this->teeter_beam_link_->GetWorldPose();
+    const gazebo::math::Quaternion rotor_disk_to_world = teeter_pose.rot;
 
     const gazebo::math::Vector3 blade1_local(this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
     const gazebo::math::Vector3 blade2_local(-this->blade_lift_x_m_, 0.0, this->blade_lift_z_m_);
 
     const gazebo::math::Vector3 blade1_pos_world =
-      rotor_pose.pos + rotor_disk_to_world.RotateVector(blade1_local);
+      teeter_pose.pos + rotor_disk_to_world.RotateVector(blade1_local);
     const gazebo::math::Vector3 blade2_pos_world =
-      rotor_pose.pos + rotor_disk_to_world.RotateVector(blade2_local);
+      teeter_pose.pos + rotor_disk_to_world.RotateVector(blade2_local);
 
     const gazebo::math::Vector3 blade1_force_world =
       rotor_disk_to_world.RotateVector(gazebo::math::Vector3(0.0, 0.0, blade1_lift_n));
@@ -1001,55 +1012,8 @@ private:
 
 #endif
 
-    this->base_link_->AddForceAtWorldPosition(blade1_force_world, blade1_pos_world);
-    this->base_link_->AddForceAtWorldPosition(blade2_force_world, blade2_pos_world);
-
-    double east_disk_tilt_deg = 0.0;
-    double north_disk_tilt_deg = 0.0;
-    double east_disk_tilt_force_n = 0.0;
-    double north_disk_tilt_force_n = 0.0;
-
-    if (px4_command_active && this->cyclic_disk_tilt_per_deg_ > 0.0) {
-      east_disk_tilt_deg = std::max(-this->max_cyclic_disk_tilt_deg_,
-        std::min(this->cyclic_world_east_deg_ * this->cyclic_disk_tilt_per_deg_,
-          this->max_cyclic_disk_tilt_deg_));
-      north_disk_tilt_deg = std::max(-this->max_cyclic_disk_tilt_deg_,
-        std::min(this->cyclic_world_north_deg_ * this->cyclic_disk_tilt_per_deg_,
-          this->max_cyclic_disk_tilt_deg_));
-      east_disk_tilt_force_n = total_lift_n * std::tan(DegToRad(east_disk_tilt_deg));
-      north_disk_tilt_force_n = total_lift_n * std::tan(DegToRad(north_disk_tilt_deg));
-
-#if GAZEBO_MAJOR_VERSION >= 8
-      const ignition::math::Vector3d cyclic_disk_tilt_force_world(
-        east_disk_tilt_force_n,
-        north_disk_tilt_force_n,
-        0.0);
-#else
-      const gazebo::math::Vector3 cyclic_disk_tilt_force_world(
-        east_disk_tilt_force_n,
-        north_disk_tilt_force_n,
-        0.0);
-#endif
-      this->base_link_->AddForce(cyclic_disk_tilt_force_world);
-    }
-
-    if (px4_command_active && this->cyclic_moment_per_deg_nm_ > 0.0) {
-#if GAZEBO_MAJOR_VERSION >= 8
-      const ignition::math::Pose3d base_pose = this->base_link_->WorldPose();
-      const ignition::math::Vector3d cyclic_torque_body(
-        this->roll_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
-        this->pitch_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
-        0.0);
-      this->base_link_->AddTorque(base_pose.Rot().RotateVector(cyclic_torque_body));
-#else
-      const gazebo::math::Pose base_pose = this->base_link_->GetWorldPose();
-      const gazebo::math::Vector3 cyclic_torque_body(
-        this->roll_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
-        this->pitch_cyclic_deg_ * this->cyclic_moment_per_deg_nm_,
-        0.0);
-      this->base_link_->AddTorque(base_pose.rot.RotateVector(cyclic_torque_body));
-#endif
-    }
+    this->teeter_beam_link_->AddForceAtWorldPosition(blade1_force_world, blade1_pos_world);
+    this->teeter_beam_link_->AddForceAtWorldPosition(blade2_force_world, blade2_pos_world);
 
     const double state_debug_interval = std::max(0.02, this->teeter_state_debug_interval_sec_);
     if (this->print_teeter_state_debug_ &&
@@ -1067,8 +1031,6 @@ private:
                 << ", teeter = " << this->teeter_angle_rad_ * 180.0 / M_PI
                 << " deg, teeter_rate = " << this->teeter_rate_rad_s_ * 180.0 / M_PI << " deg/s"
                 << ", cyclic = [" << this->roll_cyclic_deg_ << ", " << this->pitch_cyclic_deg_ << "] deg"
-                << ", disk tilt E/N = [" << east_disk_tilt_deg << ", " << north_disk_tilt_deg << "] deg"
-                << ", disk force E/N = [" << east_disk_tilt_force_n << ", " << north_disk_tilt_force_n << "] N"
                 << ", total lift = " << total_lift_n << " N"
                 << ", net = " << net_n << " N"
                 << ", drive torque = " << this->DriveTorqueNewtonMeter(omega_cmd) << " N*m"
@@ -1093,14 +1055,17 @@ private:
   double min_collective_cmd_deg_{2.0};
   double max_collective_cmd_deg_{12.0};
   double max_cyclic_deg_{2.0};
-  double cyclic_moment_per_deg_nm_{35.0};
-  double cyclic_disk_tilt_per_deg_{0.0};
-  double max_cyclic_disk_tilt_deg_{8.0};
   double px4_command_timeout_sec_{0.5};
   bool print_px4_input_debug_{false};
   double px4_input_debug_interval_sec_{0.2};
   bool print_teeter_state_debug_{true};
   double teeter_state_debug_interval_sec_{1.0};
+
+  bool visual_inspection_mode_{false};
+  double visual_inspection_blade_pitch_deg_{5.0};
+  double visual_inspection_rotor_azimuth_deg_{0.0};
+  double visual_inspection_teeter_deg_{0.0};
+  bool update_blade_pitch_visuals_during_flight_{false};
 
   bool has_px4_command_{false};
   double px4_engine_throttle_cmd_{0.0};
@@ -1119,10 +1084,12 @@ private:
   physics::ModelPtr model_;
   physics::LinkPtr base_link_;
   physics::LinkPtr rotor_link_;
+  physics::LinkPtr teeter_beam_link_;
+  physics::LinkPtr blade1_pitch_link_;
+  physics::LinkPtr blade2_pitch_link_;
   physics::LinkPtr payload_link_;
-  physics::LinkPtr blade1_indicator_link_;
-  physics::LinkPtr blade2_indicator_link_;
   physics::JointPtr joint_;
+  physics::JointPtr teeter_hinge_joint_;
   event::ConnectionPtr update_connection_;
 
   // Primary variables.
@@ -1143,8 +1110,6 @@ private:
   double collective_deg_{7.27};
   double roll_cyclic_deg_{0.0};
   double pitch_cyclic_deg_{0.0};
-  double cyclic_world_north_deg_{0.0};
-  double cyclic_world_east_deg_{0.0};
   double cyclic_phase_offset_deg_{0.0};
   std::string cyclic_azimuth_source_{"joint"};
   double cyclic_azimuth_zero_offset_rad_{0.0};
@@ -1181,13 +1146,6 @@ private:
   double rotor_omega_{0.0};
   bool rotor_time_initialized_{false};
   common::Time last_rotor_update_time_{0};
-
-  // Visual pitch indicators.
-  bool show_pitch_indicators_{true};
-  bool animate_pitch_indicators_{false};
-  double pitch_indicator_animation_amplitude_deg_{5.0};
-  double pitch_indicator_animation_frequency_hz_{0.25};
-  double pitch_indicator_vertical_offset_m_{0.18};
 
   // Fixed constants.
   double empty_weight_lb_{42.0};
