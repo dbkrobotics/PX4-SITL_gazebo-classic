@@ -785,10 +785,6 @@ void GazeboMavlinkInterface::ImuCallback(ImuPtr& imu_message)
           debug_vect.y = static_cast<float>(theta * 180.0 / M_PI);
           debug_vect.z = static_cast<float>(quantized_theta * 180.0 / M_PI);
 
-          mavlink_message_t msg;
-          mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &msg, &debug_vect);
-          mavlink_interface_->send_mavlink_message(&msg);
-
           mavlink_debug_vect_t debug_gyro{};
           debug_gyro.time_usec = now.Double() * 1e6;
           strncpy(debug_gyro.name, "as56gyro", sizeof(debug_gyro.name));
@@ -810,6 +806,12 @@ void GazeboMavlinkInterface::ImuCallback(ImuPtr& imu_message)
           mavlink_message_t rate_msg;
           mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &rate_msg, &debug_rate);
           mavlink_interface_->send_mavlink_message(&rate_msg);
+
+          // Send the azimuth sample last so a single-sample uORB debug_vect
+          // subscriber sees the blade angle rather than the auxiliary debug values.
+          mavlink_message_t msg;
+          mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &msg, &debug_vect);
+          mavlink_interface_->send_mavlink_message(&msg);
         }
       }
 

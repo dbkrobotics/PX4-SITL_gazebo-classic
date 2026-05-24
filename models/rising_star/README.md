@@ -468,10 +468,10 @@ This will allow controlled roll and pitch moments.
 Map PX4 actuator outputs to plugin inputs:
 
 ```text
-PX4 output 1 -> engineThrottle
-PX4 output 2 -> collective
-PX4 output 3 -> roll cyclic
-PX4 output 4 -> pitch cyclic
+PX4 output 1 -> engine throttle A
+PX4 output 2 -> engine throttle B
+PX4 output 3 -> blade 1 pitch servo
+PX4 output 4 -> blade 2 pitch servo
 ```
 
 This requires:
@@ -563,7 +563,7 @@ rising_star
 Pixhawk 6X Pro HITL bring-up:
 
 Build and upload the HITL-specific Pixhawk 6X firmware. The
-`px4_fmu-v6x_hitl` configuration includes `teeter_control` and `pwm_out_sim`,
+`px4_fmu-v6x_hitl` configuration includes `rising_star_control` and `pwm_out_sim`,
 which are required for this model's airframe and external HITL actuator bridge.
 The normal `px4_fmu-v6x_default` firmware remains the general hardware build.
 
