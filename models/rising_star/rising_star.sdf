@@ -374,9 +374,9 @@
         </inertia>
       </inertial>
 
-      <!-- Right teeter beam: center pivot -> blade_1_visual root -->
+      <!-- Forward teeter beam: center pivot -> blade_1_visual root (+Y span) -->
       <collision name="teeter_beam_right_collision">
-        <pose>0.4572 0 -0.0889 0 1.37881010908 0</pose>
+        <pose>0 0.4572 -0.0889 -1.37881010908 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
@@ -385,7 +385,7 @@
         </geometry>
       </collision>
       <visual name="teeter_beam_right_visual">
-        <pose>0.4572 0 -0.0889 0 1.37881010908 0</pose>
+        <pose>0 0.4572 -0.0889 -1.37881010908 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
@@ -398,9 +398,9 @@
         </material>
       </visual>
 
-      <!-- Left teeter beam: center pivot -> blade_2_visual root -->
+      <!-- Aft teeter beam: center pivot -> blade_2_visual root (-Y span) -->
       <collision name="teeter_beam_left_collision">
-        <pose>-0.4572 0 -0.0889 0 -1.37881010908 0</pose>
+        <pose>0 -0.4572 -0.0889 1.37881010908 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
@@ -409,7 +409,7 @@
         </geometry>
       </collision>
       <visual name="teeter_beam_left_visual">
-        <pose>-0.4572 0 -0.0889 0 -1.37881010908 0</pose>
+        <pose>0 -0.4572 -0.0889 1.37881010908 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
@@ -424,7 +424,7 @@
 
       <!-- Optional root clamps to make the blade connection obvious. -->
       <visual name="blade_1_root_clamp_visual">
-        <pose>0.9144 0 0.0000 0 0 0</pose>
+        <pose>0 0.9144 0.0000 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.07</radius>
@@ -436,7 +436,7 @@
         </material>
       </visual>
       <visual name="blade_2_root_clamp_visual">
-        <pose>-0.9144 0 0.0000 0 0 0</pose>
+        <pose>0 -0.9144 0.0000 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.07</radius>
@@ -449,7 +449,7 @@
       </visual>
 
       <visual name="tip_weight_1_visual">
-        <pose>3.6072 0 0.5234 0 0 0</pose>
+        <pose>0 3.6072 0.5234 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.08</radius>
@@ -457,7 +457,7 @@
         </geometry>
       </visual>
       <visual name="tip_weight_2_visual">
-        <pose>-3.6072 0 0.5234 0 0 0</pose>
+        <pose>0 -3.6072 0.5234 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.08</radius>
@@ -468,7 +468,7 @@
       <!-- Visible GP-76 engine placeholders at 3 ft radius.
            These live on teeter_beam_link so the engines follow the blade beam. -->
       <visual name="gp76_engine_1_body_visual">
-        <pose>0.9144 0.18 0.03 0 0 0</pose>
+        <pose>-0.18 0.9144 0.03 0 0 1.57079632679</pose>
         <geometry>
           <box>
             <size>0.32 0.22 0.20</size>
@@ -480,7 +480,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_1_cylinder_visual">
-        <pose>0.9144 0.18 0.20 1.57079632679 0 0</pose>
+        <pose>-0.18 0.9144 0.20 1.57079632679 0 1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.10</radius>
@@ -493,7 +493,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_1_prop_disc_visual">
-        <pose>0.9144 0.42 0.03 1.57079632679 0 0</pose>
+        <pose>-0.42 0.9144 0.03 1.57079632679 0 1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.22</radius>
@@ -507,7 +507,7 @@
       </visual>
 
       <visual name="gp76_engine_2_body_visual">
-        <pose>-0.9144 -0.18 0.03 0 0 3.14159265359</pose>
+        <pose>0.18 -0.9144 0.03 0 0 -1.57079632679</pose>
         <geometry>
           <box>
             <size>0.32 0.22 0.20</size>
@@ -519,7 +519,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_2_cylinder_visual">
-        <pose>-0.9144 -0.18 0.20 1.57079632679 0 0</pose>
+        <pose>0.18 -0.9144 0.20 1.57079632679 0 -1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.10</radius>
@@ -532,7 +532,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_2_prop_disc_visual">
-        <pose>-0.9144 -0.42 0.03 1.57079632679 0 0</pose>
+        <pose>0.42 -0.9144 0.03 1.57079632679 0 -1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.22</radius>
@@ -555,7 +555,7 @@
          lift is applied by the plugin; collisions here would inject contact
          forces while the plugin kinematically moves the links. -->
     <link name="blade_1_pitch_link">
-      <pose>2.2608 0 0.9557 0 -0.191986 0</pose>
+      <pose>0 2.2608 0.9557 0 -0.191986 1.57079632679</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <kinematic>true</kinematic>
@@ -584,7 +584,7 @@
     </link>
 
     <link name="blade_2_pitch_link">
-      <pose>-2.2608 0 0.9557 0 -0.191986 3.14159265359</pose>
+      <pose>0 -2.2608 0.9557 0 -0.191986 -1.57079632679</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <kinematic>true</kinematic>
@@ -710,8 +710,8 @@
       <child>teeter_beam_link</child>
       <pose>0 0 0.694 0 0 0</pose>
       <axis>
-        <!-- Blade span is along rotor local X, so the seesaw hinge axis is Y. -->
-        <xyz>0 1 0</xyz>
+        <!-- Blade span is along rotor local Y, so the seesaw hinge axis is X. -->
+        <xyz>1 0 0</xyz>
         <limit>
           <lower>-0.2617993878</lower>
           <upper>0.2617993878</upper>
@@ -840,8 +840,9 @@
            time and commanded RPM. -->
       <cyclicAzimuthSource>as5600</cyclicAzimuthSource>
       <!-- cyclicAzimuthZeroOffsetRad:
-           AS5600-style zero offset. Tune so 0 rad means blade 1 is at the
-           cyclic formula's +X reference direction. -->
+           AS5600-style zero offset. In the hardware-like Y-span geometry,
+           rising_star_control adds a +90 deg blade azimuth offset because
+           blade 1 is on rotor local +Y at AS5600 zero. -->
       <cyclicAzimuthZeroOffsetRad>0.0</cyclicAzimuthZeroOffsetRad>
       <!-- cyclicAzimuthDirection:
            Set to -1 if the sensor angle increases opposite the rotor model's
@@ -868,7 +869,7 @@
       <!-- ================================================================== -->
       <!-- enableTeeterDynamics:
            true = integrate a simplified teeter/flapping angle in the plugin.
-           Blade lift imbalance creates a moment about the rotor local Y axis,
+           Blade lift imbalance creates a moment about the rotor local X axis,
            beta is clamped by teeterAngleLimitDeg, and blade forces are applied
            in the tilted disk frame. This is an intermediate model before
            adding a full SDF teeter hinge/link stack. -->
