@@ -1058,7 +1058,7 @@ private:
   double px4_command_timeout_sec_{0.5};
   bool print_px4_input_debug_{false};
   double px4_input_debug_interval_sec_{0.2};
-  bool print_teeter_state_debug_{true};
+  bool print_teeter_state_debug_{false};
   double teeter_state_debug_interval_sec_{1.0};
 
   bool visual_inspection_mode_{false};

@@ -960,7 +960,7 @@
       <!-- Teeter state debug:
            Prints RPM, blade pitch, teeter angle/rate, and lift to
            the Gazebo terminal. -->
-      <printTeeterStateDebug>true</printTeeterStateDebug>
+      <printTeeterStateDebug>false</printTeeterStateDebug>
       <teeterStateDebugIntervalSec>1.0</teeterStateDebugIntervalSec>
 
       <!-- Engine dynamics -->
