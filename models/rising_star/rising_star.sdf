@@ -374,7 +374,7 @@
         </inertia>
       </inertial>
 
-      <!-- Forward teeter beam: center pivot -> blade_1_visual root (+Y span) -->
+      <!-- Left teeter beam: center pivot -> blade_2_visual root (+Y span) -->
       <collision name="teeter_beam_right_collision">
         <pose>0 0.4572 -0.0889 -1.37881010908 0 0</pose>
         <geometry>
@@ -398,7 +398,7 @@
         </material>
       </visual>
 
-      <!-- Aft teeter beam: center pivot -> blade_2_visual root (-Y span) -->
+      <!-- Right teeter beam: center pivot -> blade_1_visual root (-Y span) -->
       <collision name="teeter_beam_left_collision">
         <pose>0 -0.4572 -0.0889 1.37881010908 0 0</pose>
         <geometry>
@@ -424,7 +424,7 @@
 
       <!-- Optional root clamps to make the blade connection obvious. -->
       <visual name="blade_1_root_clamp_visual">
-        <pose>0 0.9144 0.0000 0 0 0</pose>
+        <pose>0 -0.9144 0.0000 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.07</radius>
@@ -436,7 +436,7 @@
         </material>
       </visual>
       <visual name="blade_2_root_clamp_visual">
-        <pose>0 -0.9144 0.0000 0 0 0</pose>
+        <pose>0 0.9144 0.0000 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.07</radius>
@@ -449,7 +449,7 @@
       </visual>
 
       <visual name="tip_weight_1_visual">
-        <pose>0 3.6072 0.5234 0 0 0</pose>
+        <pose>0 -3.6072 0.5234 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.08</radius>
@@ -457,7 +457,7 @@
         </geometry>
       </visual>
       <visual name="tip_weight_2_visual">
-        <pose>0 -3.6072 0.5234 0 0 0</pose>
+        <pose>0 3.6072 0.5234 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.08</radius>
@@ -468,7 +468,7 @@
       <!-- Visible GP-76 engine placeholders at 3 ft radius.
            These live on teeter_beam_link so the engines follow the blade beam. -->
       <visual name="gp76_engine_1_body_visual">
-        <pose>-0.18 0.9144 0.03 0 0 1.57079632679</pose>
+        <pose>0.18 -0.9144 0.03 0 0 -1.57079632679</pose>
         <geometry>
           <box>
             <size>0.32 0.22 0.20</size>
@@ -480,7 +480,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_1_cylinder_visual">
-        <pose>-0.18 0.9144 0.20 1.57079632679 0 1.57079632679</pose>
+        <pose>0.18 -0.9144 0.20 1.57079632679 0 -1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.10</radius>
@@ -493,7 +493,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_1_prop_disc_visual">
-        <pose>-0.42 0.9144 0.03 1.57079632679 0 1.57079632679</pose>
+        <pose>0.42 -0.9144 0.03 1.57079632679 0 -1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.22</radius>
@@ -507,7 +507,7 @@
       </visual>
 
       <visual name="gp76_engine_2_body_visual">
-        <pose>0.18 -0.9144 0.03 0 0 -1.57079632679</pose>
+        <pose>-0.18 0.9144 0.03 0 0 1.57079632679</pose>
         <geometry>
           <box>
             <size>0.32 0.22 0.20</size>
@@ -519,7 +519,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_2_cylinder_visual">
-        <pose>0.18 -0.9144 0.20 1.57079632679 0 -1.57079632679</pose>
+        <pose>-0.18 0.9144 0.20 1.57079632679 0 1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.10</radius>
@@ -532,7 +532,7 @@
         </material>
       </visual>
       <visual name="gp76_engine_2_prop_disc_visual">
-        <pose>0.42 -0.9144 0.03 1.57079632679 0 -1.57079632679</pose>
+        <pose>-0.42 0.9144 0.03 1.57079632679 0 1.57079632679</pose>
         <geometry>
           <cylinder>
             <radius>0.22</radius>
@@ -555,7 +555,7 @@
          lift is applied by the plugin; collisions here would inject contact
          forces while the plugin kinematically moves the links. -->
     <link name="blade_1_pitch_link">
-      <pose>0 2.2608 0.9557 0 -0.191986 1.57079632679</pose>
+      <pose>0 -2.2608 0.9557 0 -0.191986 -1.57079632679</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <kinematic>true</kinematic>
@@ -584,7 +584,7 @@
     </link>
 
     <link name="blade_2_pitch_link">
-      <pose>0 -2.2608 0.9557 0 -0.191986 -1.57079632679</pose>
+      <pose>0 2.2608 0.9557 0 -0.191986 1.57079632679</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <kinematic>true</kinematic>
@@ -798,7 +798,7 @@
            Cyclic pitch formula:
              blade_pitch = collectiveDeg
                          + rollCyclicDeg  * cos(azimuth + cyclicPhaseOffsetDeg)
-                         + pitchCyclicDeg * sin(azimuth + cyclicPhaseOffsetDeg)
+                         - pitchCyclicDeg * sin(azimuth + cyclicPhaseOffsetDeg)
 
            Blade 2 is evaluated 180 degrees away from blade 1.
       -->
@@ -841,8 +841,8 @@
       <cyclicAzimuthSource>as5600</cyclicAzimuthSource>
       <!-- cyclicAzimuthZeroOffsetRad:
            AS5600-style zero offset. In the hardware-like Y-span geometry,
-           rising_star_control adds a +90 deg blade azimuth offset because
-           blade 1 is on rotor local +Y at AS5600 zero. -->
+           blade 1 is on rotor local -Y / body right at AS5600 zero, so
+           rising_star_control adds a +90 deg blade azimuth offset. -->
       <cyclicAzimuthZeroOffsetRad>0.0</cyclicAzimuthZeroOffsetRad>
       <!-- cyclicAzimuthDirection:
            Set to -1 if the sensor angle increases opposite the rotor model's
@@ -1190,12 +1190,12 @@
 
     <include>
       <uri>model://gps</uri>
-      <pose>0.1 0 0 0 0 0</pose>
+      <pose>0 0 0.1 0 0 0</pose>
       <name>gps0</name>
     </include>
     <joint name="gps0_joint" type="fixed">
       <child>gps0::link</child>
-      <parent>base_link</parent>
+      <parent>/imu_link</parent>
     </joint>
 
     <plugin name="groundtruth_plugin" filename="libgazebo_groundtruth_plugin.so">
@@ -1208,6 +1208,7 @@
       <randomWalk>6.4e-06</randomWalk>
       <biasCorrelationTime>600</biasCorrelationTime>
       <magTopic>/mag</magTopic>
+      <linkName>/imu_link</linkName>
     </plugin>
     <plugin name="barometer_plugin" filename="libgazebo_barometer_plugin.so">
       <robotNamespace />
@@ -1235,13 +1236,14 @@
       <send_vision_estimation>0</send_vision_estimation>
       <send_odometry>1</send_odometry>
       <enable_lockstep>1</enable_lockstep>
-      <!-- The FC/IMU is mounted on rotor_link, while stock PX4 still expects
-           body-frame IMU data. De-rotate the rotor-frame IMU into base_link
-           before forwarding it to PX4. -->
-      <derotateImuToBaseLink>true</derotateImuToBaseLink>
+      <!-- Hardware-like path: forward rotating-frame IMU data to PX4, publish
+           fake AS5600, and let PX4's VehicleIMU/VehicleMagnetometer derotate
+           the sensor streams with the same rotor_encoder source. -->
+      <derotateImuToBaseLink>false</derotateImuToBaseLink>
       <derotateImuBaseLinkName>base_link</derotateImuBaseLinkName>
       <derotateImuSensorLinkName>/imu_link</derotateImuSensorLinkName>
-      <derotateImuUseFakeAs5600>true</derotateImuUseFakeAs5600>
+      <derotateImuUseFakeAs5600>false</derotateImuUseFakeAs5600>
+      <publishFakeAs5600>true</publishFakeAs5600>
       <fakeAs5600ZeroOffsetRad>0.0</fakeAs5600ZeroOffsetRad>
       <fakeAs5600Direction>1</fakeAs5600Direction>
       <fakeAs5600RateLpfHz>30.0</fakeAs5600RateLpfHz>

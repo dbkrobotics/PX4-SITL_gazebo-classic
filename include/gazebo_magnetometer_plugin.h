@@ -89,8 +89,10 @@ protected:
 private:
   std::string namespace_;
   physics::ModelPtr model_;
+  physics::LinkPtr link_;
   physics::WorldPtr world_;
   std::string mag_topic_;
+  std::string link_name_;
   transport::NodePtr node_handle_;
   transport::PublisherPtr pub_mag_;
   transport::SubscriberPtr gt_sub_;

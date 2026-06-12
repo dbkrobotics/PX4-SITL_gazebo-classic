@@ -52,7 +52,9 @@ MagnetometerPlugin::MagnetometerPlugin() : ModelPlugin(),
 
 MagnetometerPlugin::~MagnetometerPlugin()
 {
-  update_connection_->~Connection();
+  if (update_connection_) {
+    update_connection_->~Connection();
+  }
 }
 
 void MagnetometerPlugin::getSdfParams(sdf::ElementPtr sdf)
@@ -99,6 +101,10 @@ void MagnetometerPlugin::getSdfParams(sdf::ElementPtr sdf)
     gzwarn << "[gazebo_magnetometer_plugin] Using default magnetometer topic " << mag_topic_ << "\n";
   }
 
+  if (sdf->HasElement("linkName")) {
+    link_name_ = sdf->GetElement("linkName")->Get<std::string>();
+  }
+
   gt_sub_topic_ = "/groundtruth";
 }
 
@@ -108,6 +114,21 @@ void MagnetometerPlugin::Load(physics::ModelPtr model, sdf::ElementPtr sdf)
 
   model_ = model;
   world_ = model_->GetWorld();
+  link_.reset();
+
+  if (!link_name_.empty()) {
+    link_ = model_->GetLink(link_name_);
+
+    if (!link_ && link_name_[0] == '/') {
+      link_ = model_->GetLink(link_name_.substr(1));
+    }
+
+    if (!link_) {
+      gzerr << "[gazebo_magnetometer_plugin] linkName '" << link_name_
+            << "' not found, falling back to model pose.\n";
+    }
+  }
+
 #if GAZEBO_MAJOR_VERSION >= 9
   last_time_ = world_->SimTime();
   last_pub_time_ = world_->SimTime();
@@ -197,9 +218,10 @@ void MagnetometerPlugin::OnUpdate(const common::UpdateInfo&)
     ignition::math::Vector3d magnetic_field_I(X, Y, Z);
 
 #if GAZEBO_MAJOR_VERSION >= 9
-    ignition::math::Pose3d T_W_I = model_->WorldPose();
+    ignition::math::Pose3d T_W_I = link_ ? link_->WorldPose() : model_->WorldPose();
 #else
-    ignition::math::Pose3d T_W_I = ignitionFromGazeboMath(model_->GetWorldPose());
+    ignition::math::Pose3d T_W_I = link_ ? ignitionFromGazeboMath(link_->GetWorldPose()) :
+                                   ignitionFromGazeboMath(model_->GetWorldPose());
 #endif
     ignition::math::Quaterniond q_body_to_world = q_ENU_to_NED * T_W_I.Rot() * q_FLU_to_FRD.Inverse();
 

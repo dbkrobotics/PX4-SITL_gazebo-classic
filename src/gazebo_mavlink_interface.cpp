@@ -220,6 +220,10 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
       derotate_imu_sensor_link_name_);
   getSdfParam<bool>(_sdf, "derotateImuUseFakeAs5600", derotate_imu_use_fake_as5600_,
       derotate_imu_use_fake_as5600_);
+  getSdfParam<bool>(_sdf, "publishFakeAs5600", publish_fake_as5600_, publish_fake_as5600_);
+  if (!_sdf->HasElement("publishFakeAs5600")) {
+    publish_fake_as5600_ = derotate_imu_use_fake_as5600_;
+  }
   getSdfParam<double>(_sdf, "fakeAs5600ZeroOffsetRad", fake_as5600_zero_offset_rad_,
       fake_as5600_zero_offset_rad_);
   getSdfParam<double>(_sdf, "fakeAs5600UlogIntervalSec", fake_as5600_ulog_interval_s_,
@@ -231,21 +235,24 @@ void GazeboMavlinkInterface::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf
 
   fake_as5600_direction_ = fake_as5600_direction_ >= 0 ? 1 : -1;
 
-  if (derotate_imu_to_base_link_) {
+  if (derotate_imu_to_base_link_ || publish_fake_as5600_) {
     derotate_imu_base_link_ = model_->GetLink(derotate_imu_base_link_name_);
     derotate_imu_sensor_link_ = model_->GetLink(derotate_imu_sensor_link_name_);
 
     if (!derotate_imu_base_link_ || !derotate_imu_sensor_link_) {
-      gzerr << "[gazebo_mavlink_interface] IMU de-rotation requested but links were not found. "
+      gzerr << "[gazebo_mavlink_interface] IMU de-rotation/fake AS5600 requested but links were not found. "
             << "base='" << derotate_imu_base_link_name_ << "' found=" << static_cast<bool>(derotate_imu_base_link_)
             << ", sensor='" << derotate_imu_sensor_link_name_ << "' found=" << static_cast<bool>(derotate_imu_sensor_link_)
-            << ". Disabling de-rotation.\n";
+            << ". Disabling de-rotation and fake AS5600 publishing.\n";
       derotate_imu_to_base_link_ = false;
+      publish_fake_as5600_ = false;
     } else {
-      gzmsg << "[gazebo_mavlink_interface] IMU de-rotation enabled. "
+      gzmsg << "[gazebo_mavlink_interface] Rising Star IMU/AS5600 path. "
             << "sensor='" << derotate_imu_sensor_link_name_
             << "' -> base='" << derotate_imu_base_link_name_
-            << "', fake_as5600=" << derotate_imu_use_fake_as5600_ << "\n";
+            << "', imu_derotate=" << derotate_imu_to_base_link_
+            << "', fake_as5600_derotate=" << derotate_imu_use_fake_as5600_
+            << ", fake_as5600_publish=" << publish_fake_as5600_ << "\n";
     }
   }
 
@@ -701,123 +708,124 @@ void GazeboMavlinkInterface::ImuCallback(ImuPtr& imu_message)
     imu_message->angular_velocity().y(),
     imu_message->angular_velocity().z());
 
+  double fake_as5600_quantized_theta = 0.0;
+  double fake_as5600_theta_dot = 0.0;
+  double fake_as5600_raw_theta_dot = 0.0;
+  uint16_t fake_as5600_raw_angle = 0;
+  bool fake_as5600_valid = false;
+
+  if ((derotate_imu_use_fake_as5600_ || publish_fake_as5600_) && derotate_imu_base_link_ && derotate_imu_sensor_link_) {
+    const double two_pi = 2.0 * M_PI;
+    const ignition::math::Quaterniond sensor_to_world = derotate_imu_sensor_link_->WorldPose().Rot();
+    const ignition::math::Quaterniond base_to_world = derotate_imu_base_link_->WorldPose().Rot();
+    const ignition::math::Quaterniond sensor_to_base = base_to_world.Inverse() * sensor_to_world;
+    double theta = fake_as5600_direction_ * sensor_to_base.Yaw() + fake_as5600_zero_offset_rad_;
+
+    theta = std::fmod(theta, two_pi);
+
+    if (theta < 0.0) {
+      theta += two_pi;
+    }
+
+    fake_as5600_raw_angle = static_cast<uint16_t>(std::floor(theta * 4096.0 / two_pi + 0.5)) & 0x0fff;
+    fake_as5600_quantized_theta =
+      fake_as5600_direction_ * (static_cast<double>(fake_as5600_raw_angle) * two_pi / 4096.0 - fake_as5600_zero_offset_rad_);
+
+#if GAZEBO_MAJOR_VERSION >= 9
+    const common::Time now = world_->SimTime();
+#else
+    const common::Time now = world_->GetSimTime();
+#endif
+
+    if (fake_as5600_rate_initialized_) {
+      const double dt = (now - fake_as5600_last_rate_time_).Double();
+
+      if (dt > 1e-6) {
+        int raw_delta = static_cast<int>(fake_as5600_raw_angle) - fake_as5600_last_raw_angle_;
+
+        if (raw_delta > 2048) {
+          raw_delta -= 4096;
+
+        } else if (raw_delta < -2048) {
+          raw_delta += 4096;
+        }
+
+        fake_as5600_raw_theta_dot = fake_as5600_direction_ * static_cast<double>(raw_delta) * two_pi / 4096.0 / dt;
+
+        if (fake_as5600_rate_lpf_hz_ > 0.0) {
+          const double tau = 1.0 / (two_pi * fake_as5600_rate_lpf_hz_);
+          const double alpha = dt / (tau + dt);
+
+          if (!fake_as5600_rate_lpf_initialized_) {
+            fake_as5600_filtered_theta_dot_ = fake_as5600_raw_theta_dot;
+            fake_as5600_rate_lpf_initialized_ = true;
+
+          } else {
+            fake_as5600_filtered_theta_dot_ += alpha * (fake_as5600_raw_theta_dot - fake_as5600_filtered_theta_dot_);
+          }
+
+          fake_as5600_theta_dot = fake_as5600_filtered_theta_dot_;
+
+        } else {
+          fake_as5600_theta_dot = fake_as5600_raw_theta_dot;
+        }
+      }
+    }
+
+    fake_as5600_rate_initialized_ = true;
+    fake_as5600_last_rate_time_ = now;
+    fake_as5600_last_raw_angle_ = fake_as5600_raw_angle;
+    fake_as5600_valid = true;
+  }
+
   if (derotate_imu_to_base_link_ && derotate_imu_base_link_ && derotate_imu_sensor_link_) {
     const ignition::math::Quaterniond sensor_to_world = derotate_imu_sensor_link_->WorldPose().Rot();
     const ignition::math::Quaterniond base_to_world = derotate_imu_base_link_->WorldPose().Rot();
 
-    if (derotate_imu_use_fake_as5600_) {
-      const double two_pi = 2.0 * M_PI;
-      const ignition::math::Quaterniond sensor_to_base = base_to_world.Inverse() * sensor_to_world;
-      double theta = fake_as5600_direction_ * sensor_to_base.Yaw() + fake_as5600_zero_offset_rad_;
-
-      theta = std::fmod(theta, two_pi);
-
-      if (theta < 0.0) {
-        theta += two_pi;
-      }
-
-      const uint16_t raw_angle = static_cast<uint16_t>(std::floor(theta * 4096.0 / two_pi + 0.5)) & 0x0fff;
-      const double quantized_theta =
-        fake_as5600_direction_ * (static_cast<double>(raw_angle) * two_pi / 4096.0 - fake_as5600_zero_offset_rad_);
-      const ignition::math::Quaterniond fake_as5600_rotation(0.0, 0.0, quantized_theta);
-      double theta_dot = 0.0;
-      double raw_theta_dot = 0.0;
-
-#if GAZEBO_MAJOR_VERSION >= 9
-      const common::Time now = world_->SimTime();
-#else
-      const common::Time now = world_->GetSimTime();
-#endif
-
-      if (fake_as5600_rate_initialized_) {
-        const double dt = (now - fake_as5600_last_rate_time_).Double();
-
-        if (dt > 1e-6) {
-          int raw_delta = static_cast<int>(raw_angle) - fake_as5600_last_raw_angle_;
-
-          if (raw_delta > 2048) {
-            raw_delta -= 4096;
-
-          } else if (raw_delta < -2048) {
-            raw_delta += 4096;
-          }
-
-          raw_theta_dot = fake_as5600_direction_ * static_cast<double>(raw_delta) * two_pi / 4096.0 / dt;
-
-          if (fake_as5600_rate_lpf_hz_ > 0.0) {
-            const double tau = 1.0 / (two_pi * fake_as5600_rate_lpf_hz_);
-            const double alpha = dt / (tau + dt);
-
-            if (!fake_as5600_rate_lpf_initialized_) {
-              fake_as5600_filtered_theta_dot_ = raw_theta_dot;
-              fake_as5600_rate_lpf_initialized_ = true;
-
-            } else {
-              fake_as5600_filtered_theta_dot_ += alpha * (raw_theta_dot - fake_as5600_filtered_theta_dot_);
-            }
-
-            theta_dot = fake_as5600_filtered_theta_dot_;
-
-          } else {
-            theta_dot = raw_theta_dot;
-          }
-        }
-      }
-
-      fake_as5600_rate_initialized_ = true;
-      fake_as5600_last_rate_time_ = now;
-      fake_as5600_last_raw_angle_ = raw_angle;
-
-      const double gyro_z_before_spin_removal = gyro_flu.Z();
+    if (derotate_imu_use_fake_as5600_ && fake_as5600_valid) {
+      const ignition::math::Quaterniond fake_as5600_rotation(0.0, 0.0, fake_as5600_quantized_theta);
 
       accel_flu = fake_as5600_rotation.RotateVector(accel_flu);
       gyro_flu = fake_as5600_rotation.RotateVector(gyro_flu);
-      gyro_flu.Z() -= theta_dot;
-
-      if (fake_as5600_ulog_interval_s_ > 0.0) {
-        if ((now - fake_as5600_last_ulog_time_).Double() >= fake_as5600_ulog_interval_s_) {
-          fake_as5600_last_ulog_time_ = now;
-
-          mavlink_debug_vect_t debug_vect{};
-          debug_vect.time_usec = now.Double() * 1e6;
-          strncpy(debug_vect.name, "as5600", sizeof(debug_vect.name));
-          debug_vect.x = static_cast<float>(raw_angle);
-          debug_vect.y = static_cast<float>(theta * 180.0 / M_PI);
-          debug_vect.z = static_cast<float>(quantized_theta * 180.0 / M_PI);
-
-          mavlink_debug_vect_t debug_gyro{};
-          debug_gyro.time_usec = now.Double() * 1e6;
-          strncpy(debug_gyro.name, "as56gyro", sizeof(debug_gyro.name));
-          debug_gyro.x = static_cast<float>(theta_dot);
-          debug_gyro.y = static_cast<float>(gyro_z_before_spin_removal);
-          debug_gyro.z = static_cast<float>(gyro_flu.Z());
-
-          mavlink_message_t gyro_msg;
-          mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &gyro_msg, &debug_gyro);
-          mavlink_interface_->send_mavlink_message(&gyro_msg);
-
-          mavlink_debug_vect_t debug_rate{};
-          debug_rate.time_usec = now.Double() * 1e6;
-          strncpy(debug_rate.name, "as56rate", sizeof(debug_rate.name));
-          debug_rate.x = static_cast<float>(raw_theta_dot);
-          debug_rate.y = static_cast<float>(theta_dot);
-          debug_rate.z = static_cast<float>(fake_as5600_rate_lpf_hz_);
-
-          mavlink_message_t rate_msg;
-          mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &rate_msg, &debug_rate);
-          mavlink_interface_->send_mavlink_message(&rate_msg);
-
-          // Send the azimuth sample last so a single-sample uORB debug_vect
-          // subscriber sees the blade angle rather than the auxiliary debug values.
-          mavlink_message_t msg;
-          mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &msg, &debug_vect);
-          mavlink_interface_->send_mavlink_message(&msg);
-        }
-      }
+      gyro_flu.Z() -= fake_as5600_theta_dot;
 
     } else {
       accel_flu = base_to_world.RotateVectorReverse(sensor_to_world.RotateVector(accel_flu));
       gyro_flu = base_to_world.RotateVectorReverse(derotate_imu_base_link_->WorldAngularVel());
+    }
+  }
+
+  if (publish_fake_as5600_ && fake_as5600_valid && fake_as5600_ulog_interval_s_ > 0.0) {
+#if GAZEBO_MAJOR_VERSION >= 9
+    const common::Time now = world_->SimTime();
+#else
+    const common::Time now = world_->GetSimTime();
+#endif
+
+    if ((now - fake_as5600_last_ulog_time_).Double() >= fake_as5600_ulog_interval_s_) {
+      fake_as5600_last_ulog_time_ = now;
+
+      mavlink_debug_vect_t debug_vect{};
+      debug_vect.time_usec = now.Double() * 1e6;
+      strncpy(debug_vect.name, "as5600", sizeof(debug_vect.name));
+      debug_vect.x = static_cast<float>(fake_as5600_raw_angle);
+      debug_vect.y = static_cast<float>(fake_as5600_raw_angle * 360.0 / 4096.0);
+      debug_vect.z = static_cast<float>(fake_as5600_quantized_theta * 180.0 / M_PI);
+
+      mavlink_debug_vect_t debug_rate{};
+      debug_rate.time_usec = now.Double() * 1e6;
+      strncpy(debug_rate.name, "as56rate", sizeof(debug_rate.name));
+      debug_rate.x = static_cast<float>(fake_as5600_raw_theta_dot);
+      debug_rate.y = static_cast<float>(fake_as5600_theta_dot);
+      debug_rate.z = static_cast<float>(fake_as5600_rate_lpf_hz_);
+
+      mavlink_message_t rate_msg;
+      mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &rate_msg, &debug_rate);
+      mavlink_interface_->send_mavlink_message(&rate_msg);
+
+      mavlink_message_t msg;
+      mavlink_msg_debug_vect_encode_chan(1, 200, MAVLINK_COMM_0, &msg, &debug_vect);
+      mavlink_interface_->send_mavlink_message(&msg);
     }
   }
 

@@ -458,7 +458,7 @@ For real attitude control, pitch must vary with rotor azimuth:
 ```text
 blade_pitch = collective
             + rollCyclic * cos(azimuth + phase)
-            + pitchCyclic * sin(azimuth + phase)
+            - pitchCyclic * sin(azimuth + phase)
 ```
 
 This will allow controlled roll and pitch moments.

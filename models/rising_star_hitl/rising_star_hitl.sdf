@@ -914,11 +914,11 @@
            Cyclic pitch formula:
              blade_pitch = collectiveDeg
                          + rollCyclicDeg  * cos(azimuth + cyclicPhaseOffsetDeg)
-                         + pitchCyclicDeg * sin(azimuth + cyclicPhaseOffsetDeg)
+                         - pitchCyclicDeg * sin(azimuth + cyclicPhaseOffsetDeg)
 
            Blade 2 is evaluated 180 degrees away from blade 1.
       -->
-      <useCyclicPitch>true</useCyclicPitch>
+      <useCyclicPitch>false</useCyclicPitch>
 
       <!-- collectiveDeg:
            Mean blade pitch for both blades.
@@ -985,13 +985,15 @@
       <!-- px4InputMode:
            motor_speed = subscribe to mav_msgs::msgs::CommandMotorSpeed.
 
-           Mapping used in this first bridge:
-             actuator[0] -> engineThrottle
-             actuator[1] -> collectiveDeg
-             actuator[2] -> rollCyclicDeg
-             actuator[3] -> pitchCyclicDeg
+           With px4PitchInputMode=blade_pitch, the channel mapping follows
+           the real Pixhawk wiring:
+             actuator[0] -> engine throttle A
+             actuator[1] -> engine throttle B
+             actuator[2] -> blade 1 pitch servo
+             actuator[3] -> blade 2 pitch servo
       -->
       <px4InputMode>motor_speed</px4InputMode>
+      <px4PitchInputMode>blade_pitch</px4PitchInputMode>
 
       <!-- px4MotorSpeedScale:
            Normalization divisor for motor_speed values.
@@ -1027,22 +1029,6 @@
              normalized 1.0 -> +maxCyclicDeg
              normalized 0.0 -> -maxCyclicDeg -->
       <maxCyclicDeg>12.0</maxCyclicDeg>
-
-      <!-- cyclicMomentPerDegNm:
-           Optional bring-up assist moment applied to base_link from PX4 cyclic
-           commands. Keep this at 0 for physical cyclic-pitch-only control. -->
-      <cyclicMomentPerDegNm>0.0</cyclicMomentPerDegNm>
-
-      <!-- cyclicDiskTiltPerDeg:
-           Physical cyclic authority approximation. Tilt the effective rotor
-           thrust vector by this many disk degrees per commanded cyclic degree:
-
-             lateral_force = total_rotor_lift * tan(disk_tilt)
-
-           A value of 0.5 means a +/-12 deg cyclic command can create about
-           +/-6 deg of effective rotor disk tilt before the max clamp below. -->
-      <cyclicDiskTiltPerDeg>0.5</cyclicDiskTiltPerDeg>
-      <maxCyclicDiskTiltDeg>8.0</maxCyclicDiskTiltDeg>
 
       <!-- px4CommandTimeoutSec:
            If no PX4 actuator message is received for this many seconds,

@@ -391,21 +391,21 @@ private:
 #if GAZEBO_MAJOR_VERSION >= 8
     const ignition::math::Pose3d teeter_pose = this->teeter_beam_link_->WorldPose();
     const ignition::math::Pose3d blade1_pose(
-      ignition::math::Vector3d(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_),
-      ignition::math::Quaterniond(blade1_pitch_rad, -this->pre_cone_rad_, 0.5 * M_PI));
-    const ignition::math::Pose3d blade2_pose(
       ignition::math::Vector3d(0.0, -this->blade_lift_span_m_, this->blade_lift_z_m_),
-      ignition::math::Quaterniond(blade2_pitch_rad, -this->pre_cone_rad_, -0.5 * M_PI));
+      ignition::math::Quaterniond(blade1_pitch_rad, -this->pre_cone_rad_, -0.5 * M_PI));
+    const ignition::math::Pose3d blade2_pose(
+      ignition::math::Vector3d(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_),
+      ignition::math::Quaterniond(blade2_pitch_rad, -this->pre_cone_rad_, 0.5 * M_PI));
     this->blade1_pitch_link_->SetWorldPose(teeter_pose * blade1_pose);
     this->blade2_pitch_link_->SetWorldPose(teeter_pose * blade2_pose);
 #else
     const gazebo::math::Pose teeter_pose = this->teeter_beam_link_->GetWorldPose();
     const gazebo::math::Pose blade1_pose(
-      gazebo::math::Vector3(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_),
-      gazebo::math::Quaternion(blade1_pitch_rad, -this->pre_cone_rad_, 0.5 * M_PI));
-    const gazebo::math::Pose blade2_pose(
       gazebo::math::Vector3(0.0, -this->blade_lift_span_m_, this->blade_lift_z_m_),
-      gazebo::math::Quaternion(blade2_pitch_rad, -this->pre_cone_rad_, -0.5 * M_PI));
+      gazebo::math::Quaternion(blade1_pitch_rad, -this->pre_cone_rad_, -0.5 * M_PI));
+    const gazebo::math::Pose blade2_pose(
+      gazebo::math::Vector3(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_),
+      gazebo::math::Quaternion(blade2_pitch_rad, -this->pre_cone_rad_, 0.5 * M_PI));
     this->blade1_pitch_link_->SetWorldPose(teeter_pose + blade1_pose);
     this->blade2_pitch_link_->SetWorldPose(teeter_pose + blade2_pose);
 #endif
@@ -588,7 +588,7 @@ private:
     const double pitch =
       this->collective_deg_
       + this->roll_cyclic_deg_ * std::cos(a)
-      + this->pitch_cyclic_deg_ * std::sin(a);
+      - this->pitch_cyclic_deg_ * std::sin(a);
 
     return this->ClampPitchDeg(pitch);
   }
@@ -630,10 +630,11 @@ private:
 
     dt = std::min(dt, 0.02);
 
-    // Blade 1 is on +Y and blade 2 is on -Y in rotor coordinates. Vertical
-    // lift imbalance therefore creates a teeter moment about the rotor X axis.
+    // Blade 1 is on -Y (body right) and blade 2 is on +Y (body left) in rotor
+    // coordinates. Vertical lift imbalance therefore creates a teeter moment
+    // about the rotor X axis.
     const double lift_moment_nm =
-      this->teeter_moment_sign_ * this->blade_lift_span_m_ * (blade1_lift_n - blade2_lift_n);
+      this->teeter_moment_sign_ * this->blade_lift_span_m_ * (blade2_lift_n - blade1_lift_n);
     const double restoring_moment_nm = -this->teeter_stiffness_nm_per_rad_ * this->teeter_angle_rad_;
     const double damping_moment_nm = -this->teeter_damping_nm_per_rad_s_ * this->teeter_rate_rad_s_;
     const double inertia = std::max(1e-6, this->teeter_inertia_kgm2_);
@@ -980,8 +981,8 @@ private:
     const ignition::math::Pose3d teeter_pose = this->teeter_beam_link_->WorldPose();
     const ignition::math::Quaterniond rotor_disk_to_world = teeter_pose.Rot();
 
-    const ignition::math::Vector3d blade1_local(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_);
-    const ignition::math::Vector3d blade2_local(0.0, -this->blade_lift_span_m_, this->blade_lift_z_m_);
+    const ignition::math::Vector3d blade1_local(0.0, -this->blade_lift_span_m_, this->blade_lift_z_m_);
+    const ignition::math::Vector3d blade2_local(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_);
 
     const ignition::math::Vector3d blade1_pos_world =
       teeter_pose.Pos() + rotor_disk_to_world.RotateVector(blade1_local);
@@ -997,8 +998,8 @@ private:
     const gazebo::math::Pose teeter_pose = this->teeter_beam_link_->GetWorldPose();
     const gazebo::math::Quaternion rotor_disk_to_world = teeter_pose.rot;
 
-    const gazebo::math::Vector3 blade1_local(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_);
-    const gazebo::math::Vector3 blade2_local(0.0, -this->blade_lift_span_m_, this->blade_lift_z_m_);
+    const gazebo::math::Vector3 blade1_local(0.0, -this->blade_lift_span_m_, this->blade_lift_z_m_);
+    const gazebo::math::Vector3 blade2_local(0.0, this->blade_lift_span_m_, this->blade_lift_z_m_);
 
     const gazebo::math::Vector3 blade1_pos_world =
       teeter_pose.pos + rotor_disk_to_world.RotateVector(blade1_local);

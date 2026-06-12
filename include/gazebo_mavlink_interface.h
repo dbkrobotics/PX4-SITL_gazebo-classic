@@ -175,6 +175,7 @@ private:
   bool send_odometry_{false};
   bool derotate_imu_to_base_link_{false};
   bool derotate_imu_use_fake_as5600_{false};
+  bool publish_fake_as5600_{false};
   bool fake_as5600_rate_initialized_{false};
   bool fake_as5600_rate_lpf_initialized_{false};
   common::Time fake_as5600_last_ulog_time_{0};
