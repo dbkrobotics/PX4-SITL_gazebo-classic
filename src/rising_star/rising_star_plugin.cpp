@@ -234,8 +234,6 @@ public:
       this->blade_element_lift_scale_ = design_lift_n / design_total_lift_n;
     }
 
-    this->ConfigurePayloadLink();
-
     if (this->enable_px4_actuator_input_ && !this->visual_inspection_mode_) {
       this->px4_motor_speed_sub_ =
         this->node_->Subscribe(this->px4_actuator_topic_,
@@ -299,58 +297,6 @@ private:
     if (sdf->HasElement(name)) {
       value = sdf->Get<ignition::math::Vector3d>(name);
     }
-  }
-
-  void ConfigurePayloadLink()
-  {
-    if (!this->payload_link_) {
-      return;
-    }
-
-    const bool enabled = this->payload_enabled_ && this->payload_mass_lb_ > 0.0;
-    const double mass_kg = enabled ? this->payload_mass_kg_ : this->disabled_payload_mass_kg_;
-    const double geometry_scale = enabled ? 1.0 : std::max(0.01, this->payload_disabled_scale_);
-    const double outer_radius_m = geometry_scale *
-      std::max(0.001, 0.5 * InToM(this->payload_outer_diameter_in_));
-    const double inner_radius_m = geometry_scale *
-      std::max(0.0, 0.5 * InToM(this->payload_inner_diameter_in_));
-    const double thickness_m = geometry_scale *
-      std::max(0.001, InToM(this->payload_thickness_in_));
-    const double radius_term = outer_radius_m * outer_radius_m + inner_radius_m * inner_radius_m;
-    const double ixx_iyy = (mass_kg / 12.0) * (3.0 * radius_term + thickness_m * thickness_m);
-    const double izz = 0.5 * mass_kg * radius_term;
-
-    physics::InertialPtr inertial(new physics::Inertial);
-    inertial->SetMass(mass_kg);
-    inertial->SetCoG(0.0, 0.0, 0.0);
-    inertial->SetInertiaMatrix(ixx_iyy, ixx_iyy, izz, 0.0, 0.0, 0.0);
-    this->payload_link_->SetInertial(inertial);
-    this->payload_link_->SetGravityMode(true);
-    this->payload_link_->SetScale(ignition::math::Vector3d(
-      geometry_scale,
-      geometry_scale,
-      geometry_scale));
-    this->SetPayloadVisualVisible(enabled);
-
-    const ignition::math::Pose3d payload_pose(
-      this->payload_offset_from_cog_m_,
-      ignition::math::Quaterniond(0.0, 0.0, 0.0));
-    this->payload_link_->SetInitialRelativePose(payload_pose);
-    this->payload_link_->SetRelativePose(payload_pose);
-  }
-
-  void SetPayloadVisualVisible(bool visible)
-  {
-    if (!this->payload_visual_pub_ || !this->payload_link_) {
-      return;
-    }
-
-    msgs::Visual visual_msg;
-    visual_msg.set_name(this->payload_link_->GetScopedName() + "::payload_plate_visual");
-    visual_msg.set_parent_name(this->payload_link_->GetScopedName());
-    visual_msg.set_visible(visible);
-    visual_msg.set_transparency(visible ? 0.0 : 1.0);
-    this->payload_visual_pub_->Publish(visual_msg);
   }
 
   void SetVisualVisible(physics::LinkPtr link, const std::string &visual_name, bool visible)

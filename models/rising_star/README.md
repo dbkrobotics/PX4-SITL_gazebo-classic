@@ -70,7 +70,8 @@ At first, the rotor RPM was forced directly and lift was applied as a simple upw
 We changed the model so that:
 
 - empty vehicle weight is fixed at 42 lb,
-- physical payload mass is adjustable with `payloadMassLb`,
+- physical payload mass is represented directly by the SDF `payload_link`
+  inertial block,
 - rotor RPM can be tested independently.
 
 This allowed us to test the payload capability concept.
@@ -248,21 +249,33 @@ Main tuning variables:
 
 ### 4.4 Payload
 
-Payload is modeled as a physical `payload_link` with mass and inertia:
+Payload is modeled as a physical `payload_link` with SDF mass and inertia:
 
 ```xml
-<payloadEnabled>true</payloadEnabled>
-<payloadMassLb>360.0</payloadMassLb>
+<link name="payload_link">
+  <inertial>
+    <mass>163.2932532</mass>
+    ...
+  </inertial>
+</link>
+
+<joint name="payload_fixed_joint" type="fixed">
+  <parent>base_link</parent>
+  <child>payload_link</child>
+</joint>
 ```
 
-It affects:
+Gazebo Classic reads link mass/inertia when the model is spawned. Keep payload
+physics in SDF instead of changing it from the plugin at runtime.
 
-- inertia,
-- center of gravity,
-- pitch/roll moments due to payload position.
+Use the helper before launching SITL:
 
-For empty-vehicle tests, set `payloadEnabled` to `false`. The plugin keeps a
-small dummy inertial body and hides the payload visual.
+```sh
+Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 360
+```
+
+The helper updates only `payload_link` inertial values and the informational
+`payloadMassLb` tag. Restart Gazebo/PX4 SITL completely after changing payload.
 
 ---
 
@@ -286,9 +299,8 @@ For forced RPM testing:
 
 ### Payload
 
-```xml
-<payloadEnabled>true</payloadEnabled>
-<payloadMassLb>360.0</payloadMassLb>
+```sh
+Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 360
 ```
 
 Suggested values:
@@ -343,8 +355,6 @@ Current implementation includes visual blade pre-cone and pre-cone force applica
 ```xml
 <useEngineDynamics>false</useEngineDynamics>
 <targetRpm>220.0</targetRpm>
-<payloadEnabled>true</payloadEnabled>
-<payloadMassLb>360.0</payloadMassLb>
 ```
 
 Expected:
@@ -360,8 +370,6 @@ Expected:
 <useEngineDynamics>true</useEngineDynamics>
 <targetRpm>0.0</targetRpm>
 <engineThrottle>1.0</engineThrottle>
-<payloadEnabled>true</payloadEnabled>
-<payloadMassLb>360.0</payloadMassLb>
 ```
 
 Expected:
@@ -387,16 +395,17 @@ Heavy payload may not lift.
 
 ### Test 4: Payload Sweep
 
-Try:
+Use the helper for payload sweeps:
 
-```xml
-<payloadEnabled>false</payloadEnabled>
-<payloadEnabled>true</payloadEnabled>
-<payloadMassLb>200.0</payloadMassLb>
-<payloadMassLb>360.0</payloadMassLb>
-<payloadMassLb>398.0</payloadMassLb>
-<payloadMassLb>420.0</payloadMassLb>
+```sh
+Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 0
+Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 200
+Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 360
+Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 398
+Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 420
 ```
+
+Restart Gazebo/PX4 SITL completely after each payload inertial change.
 
 Expected:
 
@@ -501,7 +510,7 @@ The old virtual payload force has been removed. Payload is represented by:
 
 ```text
 payload_link
-payload_joint
+payload_fixed_joint
 payload mass
 payload inertia
 payload center-of-gravity offset
@@ -601,7 +610,6 @@ The model currently does not include:
 
 - blade-element aerodynamics,
 - airfoil lookup tables,
-- real payload inertia,
 - true teeter/flapping dynamics,
 - PX4 closed-loop actuator control,
 - fuel consumption,

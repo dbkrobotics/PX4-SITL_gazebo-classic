@@ -622,9 +622,9 @@
       rotor_link origin. rotor_link is at z = 0.694 m, so the payload center is
       at z = 0.194 m in model/base coordinates.
 
-      The rising_star_plugin overwrites this link's mass, inertia, collision
-      state, and relative pose from the payload parameters below. The inertial
-      values here are the 360 lb default fallback if the plugin is not loaded.
+      Gazebo physics uses the inertial values in this link at spawn time. Keep
+      the fixed joint below in SDF so the payload mass is present before the
+      physics engine initializes the model.
 
       Geometry uses the provided 17.375 in OD and 10 in stack thickness. Inertia
       assumes a standard 1 in center hole:
@@ -633,15 +633,21 @@
 
       The collision is approximated as a solid cylinder; the annular hole is
       represented in inertia, not collision geometry.
+
+      Code run
+      Tools/simulation/gazebo-classic/sitl_gazebo-classic/scripts/set_rising_star_payload.py 360
+
+
     -->
+
     <link name="payload_link">
       <pose>0 0 0.194 0 0 0</pose>
       <inertial>
-        <mass>163.2932532</mass>
+        <mass>45.3592370000</mass>
         <inertia>
-          <ixx>2.87226963</ixx>
-          <iyy>2.87226963</iyy>
-          <izz>3.98870134</izz>
+          <ixx>0.79785267</ixx>
+          <iyy>0.79785267</iyy>
+          <izz>1.10797259</izz>
           <ixy>0.0</ixy>
           <ixz>0.0</ixz>
           <iyz>0.0</iyz>
@@ -736,7 +742,7 @@
       <blade1PitchLinkName>blade_1_pitch_link</blade1PitchLinkName>
       <blade2PitchLinkName>blade_2_pitch_link</blade2PitchLinkName>
       <!-- payloadLinkName:
-           Physical payload link whose mass/inertia/pose are configured below. -->
+           Physical payload link. Its SDF inertial block is the payload physics. -->
       <payloadLinkName>payload_link</payloadLinkName>
       <!-- jointName:
            Revolute joint connecting base_link and rotor_link. -->
@@ -750,20 +756,21 @@
            Unit: rpm. -->
       <targetRpm>0.0</targetRpm>
       <!-- payloadEnabled:
-           true = fly with the physical payload_link mass.
-           false = payload_link is reduced to a stable 0.5 kg dummy inertial
-           body and its payload visual is hidden.
-           This is the main switch for with-payload / no-payload SITL runs. -->
+           true = configure physical payload mass from payloadMassLb and show
+           the payload visual.
+           false = configure a stable 0.5 kg dummy payload and hide the visual. -->
       <payloadEnabled>true</payloadEnabled>
       <!-- payloadMassLb:
-           Physical payload mass in pounds-mass.
+           Informational payload mass in pounds-mass for plugin prints and
+           calculations. Gazebo physics comes from payload_link/inertial above;
+           keep these values matched.
 
            Typical tests:
              0 lb   -> empty vehicle
              360 lb -> current barbell plate payload
              398 lb -> near 440 lb design gross
              420 lb -> 10:1 payload-to-empty target, likely overloaded -->
-      <payloadMassLb>360.0</payloadMassLb>
+      <payloadMassLb>100.0</payloadMassLb>
       <!-- payloadOffsetFromCogM:
            Payload center location in model/base coordinates, measured from the
            current system CoG frame used by the simplified model. Current value
