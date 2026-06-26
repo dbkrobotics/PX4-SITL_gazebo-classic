@@ -27,6 +27,17 @@
       <uri>model://asphalt_plane</uri>
     </include>
 
+    <!-- Keep Rising Star SITL magnetic declination near zero so a model yaw of
+         zero initializes as a 90 deg PX4 heading instead of inheriting Gazebo's
+         default Pennsylvania location, which starts near 100-110 deg. -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>51.0</latitude_deg>
+      <longitude_deg>-2.0</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
     <physics name="default_physics" default="0" type="ode">
       <gravity>0 0 -9.8066</gravity>
       <ode>

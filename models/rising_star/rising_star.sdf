@@ -643,11 +643,11 @@
     <link name="payload_link">
       <pose>0 0 0.194 0 0 0</pose>
       <inertial>
-        <mass>163.2932532000</mass>
+        <mass>0.5000000000</mass>
         <inertia>
-          <ixx>2.87226963</ixx>
-          <iyy>2.87226963</iyy>
-          <izz>3.98870134</izz>
+          <ixx>0.00879482</ixx>
+          <iyy>0.00879482</iyy>
+          <izz>0.01221331</izz>
           <ixy>0.0</ixy>
           <ixz>0.0</ixz>
           <iyz>0.0</iyz>
@@ -770,7 +770,7 @@
              360 lb -> current barbell plate payload
              398 lb -> near 440 lb design gross
              420 lb -> 10:1 payload-to-empty target, likely overloaded -->
-      <payloadMassLb>360.0</payloadMassLb>
+      <payloadMassLb>0.0</payloadMassLb>
       <!-- payloadOffsetFromCogM:
            Payload center location in model/base coordinates, measured from the
            current system CoG frame used by the simplified model. Current value
