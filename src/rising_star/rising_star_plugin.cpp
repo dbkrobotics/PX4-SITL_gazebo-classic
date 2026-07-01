@@ -4,6 +4,7 @@
 #include <gazebo/transport/transport.hh>
 #include <gazebo/msgs/msgs.hh>
 #include <CommandMotorSpeed.pb.h>
+#include <Wind.pb.h>
 
 #include <algorithm>
 #include <cmath>
@@ -97,6 +98,16 @@ public:
     this->ReadDouble(sdf, "payloadDisabledScale", this->payload_disabled_scale_);
     this->ReadDouble(sdf, "blade1PitchDeg", this->blade1_pitch_deg_);
     this->ReadDouble(sdf, "blade2PitchDeg", this->blade2_pitch_deg_);
+
+    // Simple horizontal wind/body drag.
+    this->ReadBool(sdf, "enableHorizontalWindDrag", this->enable_horizontal_wind_drag_);
+    this->ReadString(sdf, "windSubTopic", this->wind_sub_topic_);
+    this->ReadDouble(sdf, "bodyHorizontalDragCoefficient", this->body_horizontal_drag_coefficient_);
+    this->ReadDouble(sdf, "bodyHorizontalDragAreaM2", this->body_horizontal_drag_area_m2_);
+    this->ReadDouble(sdf, "payloadHorizontalDragCoefficient", this->payload_horizontal_drag_coefficient_);
+    this->ReadDouble(sdf, "payloadHorizontalDragAreaM2", this->payload_horizontal_drag_area_m2_);
+    this->ReadBool(sdf, "printWindDragDebug", this->print_wind_drag_debug_);
+    this->ReadDouble(sdf, "windDragDebugIntervalSec", this->wind_drag_debug_interval_sec_);
 
     // Azimuth-based cyclic pitch.
     this->ReadBool(sdf, "useCyclicPitch", this->use_cyclic_pitch_);
@@ -247,6 +258,21 @@ public:
                 << std::endl;
     }
 
+    if (this->enable_horizontal_wind_drag_) {
+      this->wind_sub_ =
+        this->node_->Subscribe(this->ScopedGazeboTopic(this->wind_sub_topic_),
+          &RisingStarPlugin::OnWindVelocity, this);
+
+      std::cout << "[RisingStarPlugin] Horizontal wind drag enabled. Topic: "
+                << this->ScopedGazeboTopic(this->wind_sub_topic_)
+                << ", body CdA: "
+                << this->body_horizontal_drag_coefficient_ * this->body_horizontal_drag_area_m2_
+                << " m^2, payload CdA: "
+                << this->payload_horizontal_drag_coefficient_ * this->payload_horizontal_drag_area_m2_
+                << " m^2"
+                << std::endl;
+    }
+
     this->PrintFactSheet();
 
     this->update_connection_ = event::Events::ConnectWorldUpdateBegin(
@@ -297,6 +323,127 @@ private:
     if (sdf->HasElement(name)) {
       value = sdf->Get<ignition::math::Vector3d>(name);
     }
+  }
+
+  std::string ScopedGazeboTopic(const std::string &topic) const
+  {
+    if (topic.empty()) {
+      return "~/world_wind";
+    }
+
+    if (topic[0] == '~') {
+      return topic;
+    }
+
+    if (topic[0] == '/') {
+      return "~" + topic;
+    }
+
+    return "~/" + topic;
+  }
+
+  ignition::math::Vector3d LinkWorldLinearVelocity(physics::LinkPtr link) const
+  {
+    if (!link) {
+      return ignition::math::Vector3d(0.0, 0.0, 0.0);
+    }
+
+#if GAZEBO_MAJOR_VERSION >= 8
+    return link->WorldLinearVel();
+#else
+    const gazebo::math::Vector3 velocity = link->GetWorldLinearVel();
+    return ignition::math::Vector3d(velocity.x, velocity.y, velocity.z);
+#endif
+  }
+
+  void AddWorldForce(physics::LinkPtr link, const ignition::math::Vector3d &force) const
+  {
+    if (!link) {
+      return;
+    }
+
+#if GAZEBO_MAJOR_VERSION >= 8
+    link->AddForce(force);
+#else
+    link->AddForce(gazebo::math::Vector3(force.X(), force.Y(), force.Z()));
+#endif
+  }
+
+  ignition::math::Vector3d HorizontalDragForce(
+    physics::LinkPtr link, double drag_coefficient, double drag_area_m2) const
+  {
+    if (!link || drag_coefficient <= 0.0 || drag_area_m2 <= 0.0) {
+      return ignition::math::Vector3d(0.0, 0.0, 0.0);
+    }
+
+    const ignition::math::Vector3d relative_air_velocity =
+      this->LinkWorldLinearVelocity(link) - this->wind_velocity_world_;
+    const ignition::math::Vector3d relative_air_velocity_xy(
+      relative_air_velocity.X(), relative_air_velocity.Y(), 0.0);
+    const double speed_xy = relative_air_velocity_xy.Length();
+
+    if (speed_xy < 1e-3) {
+      return ignition::math::Vector3d(0.0, 0.0, 0.0);
+    }
+
+    const double drag_scale =
+      0.5 * this->air_density_kgm3_ * drag_coefficient * drag_area_m2 * speed_xy;
+
+    return ignition::math::Vector3d(
+      -drag_scale * relative_air_velocity_xy.X(),
+      -drag_scale * relative_air_velocity_xy.Y(),
+      0.0);
+  }
+
+  void ApplyHorizontalWindDrag(const common::Time &now)
+  {
+    if (!this->enable_horizontal_wind_drag_) {
+      return;
+    }
+
+    const ignition::math::Vector3d body_drag_force =
+      this->HorizontalDragForce(
+        this->base_link_,
+        this->body_horizontal_drag_coefficient_,
+        this->body_horizontal_drag_area_m2_);
+    const ignition::math::Vector3d payload_drag_force =
+      this->HorizontalDragForce(
+        this->payload_link_,
+        this->payload_horizontal_drag_coefficient_,
+        this->payload_horizontal_drag_area_m2_);
+
+    this->AddWorldForce(this->base_link_, body_drag_force);
+    this->AddWorldForce(this->payload_link_, payload_drag_force);
+
+    const double debug_interval = std::max(0.02, this->wind_drag_debug_interval_sec_);
+    if (this->print_wind_drag_debug_ &&
+        (now - this->last_wind_drag_print_time_).Double() > debug_interval) {
+      std::cout << "[RisingStarPlugin][WIND DRAG] "
+                << "wind=[" << this->wind_velocity_world_.X()
+                << ", " << this->wind_velocity_world_.Y()
+                << ", " << this->wind_velocity_world_.Z() << "] m/s"
+                << ", body_force=[" << body_drag_force.X()
+                << ", " << body_drag_force.Y()
+                << ", " << body_drag_force.Z() << "] N"
+                << ", payload_force=[" << payload_drag_force.X()
+                << ", " << payload_drag_force.Y()
+                << ", " << payload_drag_force.Z() << "] N"
+                << std::endl;
+
+      this->last_wind_drag_print_time_ = now;
+    }
+  }
+
+  void OnWindVelocity(const boost::shared_ptr<const physics_msgs::msgs::Wind> &msg)
+  {
+    if (!msg) {
+      return;
+    }
+
+    this->wind_velocity_world_ = ignition::math::Vector3d(
+      msg->velocity().x(),
+      msg->velocity().y(),
+      msg->velocity().z());
   }
 
   void SetVisualVisible(physics::LinkPtr link, const std::string &visual_name, bool visible)
@@ -841,6 +988,13 @@ private:
           << ", offset from CoG: [" << this->payload_offset_from_cog_m_.X()
           << ", " << this->payload_offset_from_cog_m_.Y()
           << ", " << this->payload_offset_from_cog_m_.Z() << "] m\n"
+          << "Horizontal wind drag: " << (this->enable_horizontal_wind_drag_ ? "on" : "off")
+          << ", topic: " << this->ScopedGazeboTopic(this->wind_sub_topic_)
+          << ", body CdA: "
+          << this->body_horizontal_drag_coefficient_ * this->body_horizontal_drag_area_m2_
+          << " m^2, payload CdA: "
+          << this->payload_horizontal_drag_coefficient_ * this->payload_horizontal_drag_area_m2_
+          << " m^2\n"
           << "Fixed blade pitches: [" << this->blade1_pitch_deg_ << ", "
           << this->blade2_pitch_deg_ << "] deg\n"
           << "Cyclic pitch: " << (this->use_cyclic_pitch_ ? "on" : "off")
@@ -887,6 +1041,7 @@ private:
     const common::Time now = this->model_->GetWorld()->SimTime();
     this->UpdateBladeVisualMode();
     this->ApplyPx4CommandsIfActive(now);
+    this->ApplyHorizontalWindDrag(now);
     const double omega_cmd = this->visual_inspection_mode_ ? 0.0 : this->StepRotorOmega(now);
 
     if (this->visual_inspection_mode_) {
@@ -1026,6 +1181,7 @@ private:
 
   transport::NodePtr node_;
   transport::SubscriberPtr px4_motor_speed_sub_;
+  transport::SubscriberPtr wind_sub_;
   transport::PublisherPtr payload_visual_pub_;
 
   physics::ModelPtr model_;
@@ -1051,6 +1207,18 @@ private:
   double payload_disabled_scale_{0.08};
   double blade1_pitch_deg_{7.27};
   double blade2_pitch_deg_{7.27};
+
+  // Simple horizontal wind/body drag.
+  bool enable_horizontal_wind_drag_{true};
+  std::string wind_sub_topic_{"world_wind"};
+  ignition::math::Vector3d wind_velocity_world_{0.0, 0.0, 0.0};
+  double body_horizontal_drag_coefficient_{1.1};
+  double body_horizontal_drag_area_m2_{0.9};
+  double payload_horizontal_drag_coefficient_{1.1};
+  double payload_horizontal_drag_area_m2_{0.16};
+  bool print_wind_drag_debug_{false};
+  double wind_drag_debug_interval_sec_{1.0};
+  common::Time last_wind_drag_print_time_{0};
 
   // Azimuth-based cyclic pitch.
   bool use_cyclic_pitch_{true};

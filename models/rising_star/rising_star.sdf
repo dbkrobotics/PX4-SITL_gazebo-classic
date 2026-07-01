@@ -796,6 +796,42 @@
       <blade2PitchDeg>5.0</blade2PitchDeg>
 
       <!-- ================================================================== -->
+      <!-- Simple horizontal wind/body drag                                    -->
+      <!-- ================================================================== -->
+      <!-- enableHorizontalWindDrag:
+           true = subscribe to the Gazebo wind topic and add simple horizontal
+             quadratic drag on base_link and payload_link.
+           This is intentionally a first-order SITL disturbance model. It does
+           not yet model rotor disk inflow, advancing/retreating blade effects,
+           or wind-induced flapping. -->
+      <enableHorizontalWindDrag>true</enableHorizontalWindDrag>
+
+      <!-- windSubTopic:
+           Topic published by windy.world/ramped_up_wind.world through
+           libgazebo_wind_plugin.so. With windy.world this is a steady
+           4 m/s wind in the world +Y direction. -->
+      <windSubTopic>world_wind</windSubTopic>
+
+      <!-- Horizontal drag model:
+             F_xy = -0.5 * rho * Cd * area * |Vair_xy| * Vair_xy
+             Vair = link_velocity_world - wind_velocity_world
+
+           These values represent the first real 4 m/s wind-load check rather
+           than a reduced bring-up disturbance. At 4 m/s, the default total
+           horizontal force is about 11.4 N. Tune area downward only when a
+           gentler bring-up case is needed. -->
+      <bodyHorizontalDragCoefficient>1.1</bodyHorizontalDragCoefficient>
+      <bodyHorizontalDragAreaM2>0.9</bodyHorizontalDragAreaM2>
+      <payloadHorizontalDragCoefficient>1.1</payloadHorizontalDragCoefficient>
+      <payloadHorizontalDragAreaM2>0.16</payloadHorizontalDragAreaM2>
+
+      <!-- Wind drag debug:
+           Prints wind and applied body/payload force vectors to the Gazebo
+           terminal. Keep this off unless tuning the force scale. -->
+      <printWindDragDebug>false</printWindDragDebug>
+      <windDragDebugIntervalSec>1.0</windDragDebugIntervalSec>
+
+      <!-- ================================================================== -->
       <!-- Azimuth-based cyclic pitch                                          -->
       <!-- ================================================================== -->
       <!-- useCyclicPitch:
