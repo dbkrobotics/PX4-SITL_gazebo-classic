@@ -21,7 +21,9 @@
 #include <random>
 
 #include <Eigen/Core>
+#include "CommandMotorSpeed.pb.h"
 #include "Imu.pb.h"
+#include <boost/shared_ptr.hpp>
 #include <gazebo/common/common.hh>
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/gazebo.hh>
@@ -34,6 +36,7 @@
 
 namespace gazebo {
 //typedef const boost::shared_ptr<const sensor_msgs::msgs::Imu> ImuPtr;
+typedef const boost::shared_ptr<const mav_msgs::msgs::CommandMotorSpeed> CommandMotorSpeedPtr;
 
 // Default values for use with IIM42653 IMU
 static constexpr double kDefaultGyroscopeNoiseDensity =
@@ -112,13 +115,29 @@ class GazeboImuPlugin : public ModelPlugin {
       Eigen::Vector3d* angular_velocity,
       const double dt);
 
+  void addEngineVibration(
+      Eigen::Vector3d* linear_acceleration,
+      Eigen::Vector3d* angular_velocity,
+      const double time_sec);
+
   void OnUpdate(const common::UpdateInfo&);
 
  private:
+  void OnMotorCommand(CommandMotorSpeedPtr& motor_command);
+
+  double EngineVibrationScale(const double time_sec);
+
+  static Eigen::Vector3d HarmonicTerm(
+      const double frequency_hz,
+      const ignition::math::Vector3d& amplitude,
+      const ignition::math::Vector3d& phase_deg,
+      const double time_sec);
+
   std::string namespace_;
   std::string imu_topic_;
   transport::NodePtr node_handle_;
   transport::PublisherPtr imu_pub_;
+  transport::SubscriberPtr motor_command_sub_;
   std::string frame_id_;
   std::string link_name_;
 
@@ -145,6 +164,42 @@ class GazeboImuPlugin : public ModelPlugin {
   Eigen::Vector3d accelerometer_bias_;
 
   ImuParameters imu_parameters_;
+
+  bool enable_engine_imu_vibration_ = false;
+  bool engine_imu_vibration_gate_by_motor_command_ = false;
+  std::string engine_imu_vibration_motor_command_topic_ = "~/command/motor_speed";
+  double engine_imu_vibration_motor_speed_scale_ = 1000.0;
+  double engine_imu_vibration_motor_threshold_ = 0.05;
+  double engine_imu_vibration_command_timeout_sec_ = 0.5;
+  double engine_imu_vibration_start_sec_ = 0.0;
+  double engine_imu_vibration_ramp_sec_ = 0.0;
+  double engine_imu_vibration_envelope_amplitude_ = 0.0;
+  double engine_imu_vibration_envelope_period_sec_ = 0.0;
+  double engine_imu_vibration_envelope_phase_deg_ = 0.0;
+  double engine_imu_vibration_freq1_hz_ = 0.0;
+  double engine_imu_vibration_freq2_hz_ = 0.0;
+  double engine_imu_vibration_freq3_hz_ = 0.0;
+  double engine_imu_vibration_freq4_hz_ = 0.0;
+  ignition::math::Vector3d engine_imu_vibration_accel_amp1_mps2_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_accel_amp2_mps2_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_accel_amp3_mps2_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_accel_amp4_mps2_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_amp1_radps_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_amp2_radps_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_amp3_radps_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_amp4_radps_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_accel_phase1_deg_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_accel_phase2_deg_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_accel_phase3_deg_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_accel_phase4_deg_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_phase1_deg_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_phase2_deg_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_phase3_deg_{0.0, 0.0, 0.0};
+  ignition::math::Vector3d engine_imu_vibration_gyro_phase4_deg_{0.0, 0.0, 0.0};
+  bool has_engine_imu_vibration_command_ = false;
+  bool engine_imu_vibration_motor_active_ = false;
+  double engine_imu_vibration_active_since_sec_ = -1.0;
+  common::Time last_engine_imu_vibration_command_time_{0};
 
   uint64_t seq_ = 0;
 };

@@ -109,6 +109,18 @@ public:
     this->ReadBool(sdf, "printWindDragDebug", this->print_wind_drag_debug_);
     this->ReadDouble(sdf, "windDragDebugIntervalSec", this->wind_drag_debug_interval_sec_);
 
+    // Rotor imbalance disturbance.
+    this->ReadBool(sdf, "enableRotorImbalance", this->enable_rotor_imbalance_);
+    this->ReadDouble(sdf, "rotorImbalanceForceAtReferenceRpmN",
+      this->rotor_imbalance_force_at_reference_rpm_n_);
+    this->ReadDouble(sdf, "rotorImbalanceReferenceRpm", this->rotor_imbalance_reference_rpm_);
+    this->ReadDouble(sdf, "rotorImbalancePhaseDeg", this->rotor_imbalance_phase_deg_);
+    this->ReadVector3(sdf, "rotorImbalanceApplicationPointM",
+      this->rotor_imbalance_application_point_m_);
+    this->ReadBool(sdf, "printRotorImbalanceDebug", this->print_rotor_imbalance_debug_);
+    this->ReadDouble(sdf, "rotorImbalanceDebugIntervalSec",
+      this->rotor_imbalance_debug_interval_sec_);
+
     // Azimuth-based cyclic pitch.
     this->ReadBool(sdf, "useCyclicPitch", this->use_cyclic_pitch_);
     this->ReadDouble(sdf, "collectiveDeg", this->collective_deg_);
@@ -369,6 +381,24 @@ private:
 #endif
   }
 
+  void AddWorldForceAtWorldPosition(
+    physics::LinkPtr link,
+    const ignition::math::Vector3d &force,
+    const ignition::math::Vector3d &position) const
+  {
+    if (!link) {
+      return;
+    }
+
+#if GAZEBO_MAJOR_VERSION >= 8
+    link->AddForceAtWorldPosition(force, position);
+#else
+    link->AddForceAtWorldPosition(
+      gazebo::math::Vector3(force.X(), force.Y(), force.Z()),
+      gazebo::math::Vector3(position.X(), position.Y(), position.Z()));
+#endif
+  }
+
   ignition::math::Vector3d HorizontalDragForce(
     physics::LinkPtr link, double drag_coefficient, double drag_area_m2) const
   {
@@ -444,6 +474,69 @@ private:
       msg->velocity().x(),
       msg->velocity().y(),
       msg->velocity().z());
+  }
+
+  void ApplyRotorImbalance(const common::Time &now, double omega)
+  {
+    if (!this->enable_rotor_imbalance_ ||
+        this->rotor_imbalance_force_at_reference_rpm_n_ <= 0.0 ||
+        this->rotor_imbalance_reference_rpm_ <= 1e-3 ||
+        omega <= 0.0) {
+      return;
+    }
+
+    const double rpm = RadPerSecToRpm(omega);
+    const double rpm_ratio = rpm / this->rotor_imbalance_reference_rpm_;
+    const double force_n =
+      this->rotor_imbalance_force_at_reference_rpm_n_ * rpm_ratio * rpm_ratio;
+    const double phase_rad = DegToRad(this->rotor_imbalance_phase_deg_);
+    const double azimuth_rad = this->rotor_azimuth_rad_ + phase_rad;
+    const ignition::math::Vector3d force_body(
+      force_n * std::cos(azimuth_rad),
+      force_n * std::sin(azimuth_rad),
+      0.0);
+
+#if GAZEBO_MAJOR_VERSION >= 8
+    const ignition::math::Pose3d base_pose = this->base_link_->WorldPose();
+    const ignition::math::Vector3d force_world = base_pose.Rot().RotateVector(force_body);
+    const ignition::math::Vector3d position_world =
+      base_pose.Pos() + base_pose.Rot().RotateVector(this->rotor_imbalance_application_point_m_);
+#else
+    const gazebo::math::Pose base_pose = this->base_link_->GetWorldPose();
+    const gazebo::math::Vector3 force_body_gz(force_body.X(), force_body.Y(), force_body.Z());
+    const gazebo::math::Vector3 position_body_gz(
+      this->rotor_imbalance_application_point_m_.X(),
+      this->rotor_imbalance_application_point_m_.Y(),
+      this->rotor_imbalance_application_point_m_.Z());
+    const gazebo::math::Vector3 force_world_gz = base_pose.rot.RotateVector(force_body_gz);
+    const gazebo::math::Vector3 position_world_gz =
+      base_pose.pos + base_pose.rot.RotateVector(position_body_gz);
+    const ignition::math::Vector3d force_world(
+      force_world_gz.x, force_world_gz.y, force_world_gz.z);
+    const ignition::math::Vector3d position_world(
+      position_world_gz.x, position_world_gz.y, position_world_gz.z);
+#endif
+
+    this->AddWorldForceAtWorldPosition(this->base_link_, force_world, position_world);
+
+    const double debug_interval = std::max(0.02, this->rotor_imbalance_debug_interval_sec_);
+    if (this->print_rotor_imbalance_debug_ &&
+        (now - this->last_rotor_imbalance_print_time_).Double() > debug_interval) {
+      std::cout << "[RisingStarPlugin][ROTOR IMBALANCE] "
+                << "rpm=" << rpm
+                << ", force_body=[" << force_body.X()
+                << ", " << force_body.Y()
+                << ", " << force_body.Z() << "] N"
+                << ", force_world=[" << force_world.X()
+                << ", " << force_world.Y()
+                << ", " << force_world.Z() << "] N"
+                << ", point_world=[" << position_world.X()
+                << ", " << position_world.Y()
+                << ", " << position_world.Z() << "] m"
+                << std::endl;
+
+      this->last_rotor_imbalance_print_time_ = now;
+    }
   }
 
   void SetVisualVisible(physics::LinkPtr link, const std::string &visual_name, bool visible)
@@ -995,6 +1088,10 @@ private:
           << " m^2, payload CdA: "
           << this->payload_horizontal_drag_coefficient_ * this->payload_horizontal_drag_area_m2_
           << " m^2\n"
+          << "Rotor imbalance disturbance: " << (this->enable_rotor_imbalance_ ? "on" : "off")
+          << ", force at " << this->rotor_imbalance_reference_rpm_
+          << " rpm: " << this->rotor_imbalance_force_at_reference_rpm_n_
+          << " N, phase: " << this->rotor_imbalance_phase_deg_ << " deg\n"
           << "Fixed blade pitches: [" << this->blade1_pitch_deg_ << ", "
           << this->blade2_pitch_deg_ << "] deg\n"
           << "Cyclic pitch: " << (this->use_cyclic_pitch_ ? "on" : "off")
@@ -1056,6 +1153,8 @@ private:
     } else {
       this->StepRotorAzimuth(now, omega_cmd);
     }
+
+    this->ApplyRotorImbalance(now, omega_cmd);
 
     double blade1_pitch_cmd_deg = this->blade1_pitch_deg_;
     double blade2_pitch_cmd_deg = this->blade2_pitch_deg_;
@@ -1219,6 +1318,16 @@ private:
   bool print_wind_drag_debug_{false};
   double wind_drag_debug_interval_sec_{1.0};
   common::Time last_wind_drag_print_time_{0};
+
+  // Rotor imbalance disturbance.
+  bool enable_rotor_imbalance_{false};
+  double rotor_imbalance_force_at_reference_rpm_n_{0.0};
+  double rotor_imbalance_reference_rpm_{70.0};
+  double rotor_imbalance_phase_deg_{0.0};
+  ignition::math::Vector3d rotor_imbalance_application_point_m_{0.0, 0.0, 0.694};
+  bool print_rotor_imbalance_debug_{false};
+  double rotor_imbalance_debug_interval_sec_{1.0};
+  common::Time last_rotor_imbalance_print_time_{0};
 
   // Azimuth-based cyclic pitch.
   bool use_cyclic_pitch_{true};

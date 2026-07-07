@@ -20,6 +20,7 @@
 
 #include "gazebo_imu_plugin.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -28,6 +29,14 @@
 #include <boost/bind.hpp>
 
 namespace gazebo {
+namespace {
+static constexpr double kDegToRad = 0.017453292519943295;
+static constexpr double kTwoPi = 6.2831853071795864769;
+
+Eigen::Vector3d ToEigen(const ignition::math::Vector3d& value) {
+  return Eigen::Vector3d(value.X(), value.Y(), value.Z());
+}
+}
 
 GazeboImuPlugin::GazeboImuPlugin()
     : ModelPlugin(),
@@ -93,6 +102,99 @@ void GazeboImuPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
   getSdfParam<double>(_sdf, "accelerometerTurnOnBiasSigma",
                       imu_parameters_.accelerometer_turn_on_bias_sigma,
                       imu_parameters_.accelerometer_turn_on_bias_sigma);
+  getSdfParam<bool>(_sdf, "enableEngineImuVibration",
+                    enable_engine_imu_vibration_,
+                    enable_engine_imu_vibration_);
+  getSdfParam<bool>(_sdf, "engineImuVibrationGateByMotorCommand",
+                    engine_imu_vibration_gate_by_motor_command_,
+                    engine_imu_vibration_gate_by_motor_command_);
+  getSdfParam<std::string>(_sdf, "engineImuVibrationMotorCommandTopic",
+                           engine_imu_vibration_motor_command_topic_,
+                           engine_imu_vibration_motor_command_topic_);
+  getSdfParam<double>(_sdf, "engineImuVibrationMotorSpeedScale",
+                      engine_imu_vibration_motor_speed_scale_,
+                      engine_imu_vibration_motor_speed_scale_);
+  getSdfParam<double>(_sdf, "engineImuVibrationMotorThreshold",
+                      engine_imu_vibration_motor_threshold_,
+                      engine_imu_vibration_motor_threshold_);
+  getSdfParam<double>(_sdf, "engineImuVibrationCommandTimeoutSec",
+                      engine_imu_vibration_command_timeout_sec_,
+                      engine_imu_vibration_command_timeout_sec_);
+  getSdfParam<double>(_sdf, "engineImuVibrationStartSec",
+                      engine_imu_vibration_start_sec_,
+                      engine_imu_vibration_start_sec_);
+  getSdfParam<double>(_sdf, "engineImuVibrationRampSec",
+                      engine_imu_vibration_ramp_sec_,
+                      engine_imu_vibration_ramp_sec_);
+  getSdfParam<double>(_sdf, "engineImuVibrationEnvelopeAmplitude",
+                      engine_imu_vibration_envelope_amplitude_,
+                      engine_imu_vibration_envelope_amplitude_);
+  getSdfParam<double>(_sdf, "engineImuVibrationEnvelopePeriodSec",
+                      engine_imu_vibration_envelope_period_sec_,
+                      engine_imu_vibration_envelope_period_sec_);
+  getSdfParam<double>(_sdf, "engineImuVibrationEnvelopePhaseDeg",
+                      engine_imu_vibration_envelope_phase_deg_,
+                      engine_imu_vibration_envelope_phase_deg_);
+  getSdfParam<double>(_sdf, "engineImuVibrationFreq1Hz",
+                      engine_imu_vibration_freq1_hz_,
+                      engine_imu_vibration_freq1_hz_);
+  getSdfParam<double>(_sdf, "engineImuVibrationFreq2Hz",
+                      engine_imu_vibration_freq2_hz_,
+                      engine_imu_vibration_freq2_hz_);
+  getSdfParam<double>(_sdf, "engineImuVibrationFreq3Hz",
+                      engine_imu_vibration_freq3_hz_,
+                      engine_imu_vibration_freq3_hz_);
+  getSdfParam<double>(_sdf, "engineImuVibrationFreq4Hz",
+                      engine_imu_vibration_freq4_hz_,
+                      engine_imu_vibration_freq4_hz_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelAmp1Mps2",
+                                        engine_imu_vibration_accel_amp1_mps2_,
+                                        engine_imu_vibration_accel_amp1_mps2_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelAmp2Mps2",
+                                        engine_imu_vibration_accel_amp2_mps2_,
+                                        engine_imu_vibration_accel_amp2_mps2_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelAmp3Mps2",
+                                        engine_imu_vibration_accel_amp3_mps2_,
+                                        engine_imu_vibration_accel_amp3_mps2_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelAmp4Mps2",
+                                        engine_imu_vibration_accel_amp4_mps2_,
+                                        engine_imu_vibration_accel_amp4_mps2_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroAmp1Radps",
+                                        engine_imu_vibration_gyro_amp1_radps_,
+                                        engine_imu_vibration_gyro_amp1_radps_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroAmp2Radps",
+                                        engine_imu_vibration_gyro_amp2_radps_,
+                                        engine_imu_vibration_gyro_amp2_radps_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroAmp3Radps",
+                                        engine_imu_vibration_gyro_amp3_radps_,
+                                        engine_imu_vibration_gyro_amp3_radps_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroAmp4Radps",
+                                        engine_imu_vibration_gyro_amp4_radps_,
+                                        engine_imu_vibration_gyro_amp4_radps_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelPhase1Deg",
+                                        engine_imu_vibration_accel_phase1_deg_,
+                                        engine_imu_vibration_accel_phase1_deg_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelPhase2Deg",
+                                        engine_imu_vibration_accel_phase2_deg_,
+                                        engine_imu_vibration_accel_phase2_deg_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelPhase3Deg",
+                                        engine_imu_vibration_accel_phase3_deg_,
+                                        engine_imu_vibration_accel_phase3_deg_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationAccelPhase4Deg",
+                                        engine_imu_vibration_accel_phase4_deg_,
+                                        engine_imu_vibration_accel_phase4_deg_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroPhase1Deg",
+                                        engine_imu_vibration_gyro_phase1_deg_,
+                                        engine_imu_vibration_gyro_phase1_deg_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroPhase2Deg",
+                                        engine_imu_vibration_gyro_phase2_deg_,
+                                        engine_imu_vibration_gyro_phase2_deg_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroPhase3Deg",
+                                        engine_imu_vibration_gyro_phase3_deg_,
+                                        engine_imu_vibration_gyro_phase3_deg_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "engineImuVibrationGyroPhase4Deg",
+                                        engine_imu_vibration_gyro_phase4_deg_,
+                                        engine_imu_vibration_gyro_phase4_deg_);
 
   #if GAZEBO_MAJOR_VERSION >= 9
   last_time_ = world_->SimTime();
@@ -107,6 +209,12 @@ void GazeboImuPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
           boost::bind(&GazeboImuPlugin::OnUpdate, this, _1));
 
   imu_pub_ = node_handle_->Advertise<sensor_msgs::msgs::Imu>("~/" + model_->GetName() + imu_topic_, 10);
+
+  if (enable_engine_imu_vibration_ && engine_imu_vibration_gate_by_motor_command_) {
+    motor_command_sub_ =
+        node_handle_->Subscribe(engine_imu_vibration_motor_command_topic_,
+                                &GazeboImuPlugin::OnMotorCommand, this);
+  }
 
   // Fill imu message.
   // imu_message_.header.frame_id = frame_id_; TODO Add header
@@ -180,6 +288,157 @@ void GazeboImuPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
   }
 
 
+}
+
+void GazeboImuPlugin::OnMotorCommand(CommandMotorSpeedPtr& motor_command) {
+  if (!motor_command || motor_command->motor_speed_size() < 2) {
+    return;
+  }
+
+#if GAZEBO_MAJOR_VERSION >= 9
+  const common::Time now = world_->SimTime();
+#else
+  const common::Time now = world_->GetSimTime();
+#endif
+
+  const double scale = std::max(1e-6, engine_imu_vibration_motor_speed_scale_);
+  const double engine_a = std::fabs(motor_command->motor_speed(0)) / scale;
+  const double engine_b = std::fabs(motor_command->motor_speed(1)) / scale;
+  const bool motor_active =
+      std::max(engine_a, engine_b) >= engine_imu_vibration_motor_threshold_;
+
+  if (motor_active && !engine_imu_vibration_motor_active_) {
+    engine_imu_vibration_active_since_sec_ = now.Double();
+  }
+
+  if (!motor_active) {
+    engine_imu_vibration_active_since_sec_ = -1.0;
+  }
+
+  engine_imu_vibration_motor_active_ = motor_active;
+  has_engine_imu_vibration_command_ = true;
+  last_engine_imu_vibration_command_time_ = now;
+}
+
+double GazeboImuPlugin::EngineVibrationScale(const double time_sec) {
+  if (!enable_engine_imu_vibration_) {
+    return 0.0;
+  }
+
+  double elapsed = time_sec;
+
+  if (engine_imu_vibration_gate_by_motor_command_) {
+    const bool command_recent =
+        has_engine_imu_vibration_command_ &&
+        (time_sec - last_engine_imu_vibration_command_time_.Double())
+            <= engine_imu_vibration_command_timeout_sec_;
+
+    if (!command_recent || !engine_imu_vibration_motor_active_ ||
+        engine_imu_vibration_active_since_sec_ < 0.0) {
+      return 0.0;
+    }
+
+    elapsed = time_sec - engine_imu_vibration_active_since_sec_;
+
+  } else if (time_sec < engine_imu_vibration_start_sec_) {
+    return 0.0;
+  }
+
+  if (elapsed < engine_imu_vibration_start_sec_) {
+    return 0.0;
+  }
+
+  double ramp_scale = 1.0;
+
+  if (engine_imu_vibration_ramp_sec_ > 1e-6) {
+    const double ramp_fraction =
+        (elapsed - engine_imu_vibration_start_sec_) / engine_imu_vibration_ramp_sec_;
+
+    ramp_scale = std::max(0.0, std::min(1.0, ramp_fraction));
+  }
+
+  double envelope_scale = 1.0;
+
+  if (engine_imu_vibration_envelope_amplitude_ > 1e-6 &&
+      engine_imu_vibration_envelope_period_sec_ > 1e-6) {
+    const double envelope_time =
+        std::max(0.0, elapsed - engine_imu_vibration_start_sec_);
+    envelope_scale = 1.0 + engine_imu_vibration_envelope_amplitude_ *
+        std::sin(kTwoPi * envelope_time /
+                 engine_imu_vibration_envelope_period_sec_ +
+                 engine_imu_vibration_envelope_phase_deg_ * kDegToRad);
+    envelope_scale = std::max(0.0, envelope_scale);
+  }
+
+  return ramp_scale * envelope_scale;
+}
+
+Eigen::Vector3d GazeboImuPlugin::HarmonicTerm(
+    const double frequency_hz,
+    const ignition::math::Vector3d& amplitude,
+    const ignition::math::Vector3d& phase_deg,
+    const double time_sec) {
+  if (frequency_hz <= 0.0) {
+    return Eigen::Vector3d::Zero();
+  }
+
+  const Eigen::Vector3d amplitude_eigen = ToEigen(amplitude);
+  const Eigen::Vector3d phase_rad = ToEigen(phase_deg) * kDegToRad;
+  Eigen::Vector3d signal = Eigen::Vector3d::Zero();
+  const double base_phase = kTwoPi * frequency_hz * time_sec;
+
+  for (int axis = 0; axis < 3; ++axis) {
+    signal[axis] = amplitude_eigen[axis] * std::sin(base_phase + phase_rad[axis]);
+  }
+
+  return signal;
+}
+
+void GazeboImuPlugin::addEngineVibration(
+    Eigen::Vector3d* linear_acceleration,
+    Eigen::Vector3d* angular_velocity,
+    const double time_sec) {
+  const double scale = EngineVibrationScale(time_sec);
+
+  if (scale <= 0.0) {
+    return;
+  }
+
+  *linear_acceleration += scale * (
+      HarmonicTerm(engine_imu_vibration_freq1_hz_,
+                   engine_imu_vibration_accel_amp1_mps2_,
+                   engine_imu_vibration_accel_phase1_deg_,
+                   time_sec) +
+      HarmonicTerm(engine_imu_vibration_freq2_hz_,
+                   engine_imu_vibration_accel_amp2_mps2_,
+                   engine_imu_vibration_accel_phase2_deg_,
+                   time_sec) +
+      HarmonicTerm(engine_imu_vibration_freq3_hz_,
+                   engine_imu_vibration_accel_amp3_mps2_,
+                   engine_imu_vibration_accel_phase3_deg_,
+                   time_sec) +
+      HarmonicTerm(engine_imu_vibration_freq4_hz_,
+                   engine_imu_vibration_accel_amp4_mps2_,
+                   engine_imu_vibration_accel_phase4_deg_,
+                   time_sec));
+
+  *angular_velocity += scale * (
+      HarmonicTerm(engine_imu_vibration_freq1_hz_,
+                   engine_imu_vibration_gyro_amp1_radps_,
+                   engine_imu_vibration_gyro_phase1_deg_,
+                   time_sec) +
+      HarmonicTerm(engine_imu_vibration_freq2_hz_,
+                   engine_imu_vibration_gyro_amp2_radps_,
+                   engine_imu_vibration_gyro_phase2_deg_,
+                   time_sec) +
+      HarmonicTerm(engine_imu_vibration_freq3_hz_,
+                   engine_imu_vibration_gyro_amp3_radps_,
+                   engine_imu_vibration_gyro_phase3_deg_,
+                   time_sec) +
+      HarmonicTerm(engine_imu_vibration_freq4_hz_,
+                   engine_imu_vibration_gyro_amp4_radps_,
+                   engine_imu_vibration_gyro_phase4_deg_,
+                   time_sec));
 }
 
 /// \brief This function adds noise to acceleration and angular rates for
@@ -291,6 +550,7 @@ void GazeboImuPlugin::OnUpdate(const common::UpdateInfo& _info) {
                                      angular_vel_I.Y(),
                                      angular_vel_I.Z());
 
+  addEngineVibration(&linear_acceleration_I, &angular_velocity_I, t);
   addNoise(&linear_acceleration_I, &angular_velocity_I, dt);
 
   // Copy Eigen::Vector3d to gazebo::msgs::Vector3d

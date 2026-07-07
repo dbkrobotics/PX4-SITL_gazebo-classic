@@ -832,6 +832,36 @@
       <windDragDebugIntervalSec>1.0</windDragDebugIntervalSec>
 
       <!-- ================================================================== -->
+      <!-- Rotor imbalance disturbance                                         -->
+      <!-- ================================================================== -->
+      <!-- enableRotorImbalance:
+           SITL-only rotating lateral force used to emulate rotor/engine/stand
+           imbalance seen in fixed-stand hardware tests. It is disabled for
+           nominal SITL behavior; enable it only for fixed-stand comparison.
+
+           Force model:
+             F_xy = forceAtReferenceRpm * (rpm / referenceRpm)^2
+             direction rotates with the rotor azimuth plus phaseDeg
+
+           Apply this to reproduce vibration/failure-detector behavior, not as
+           an aerodynamic truth model. Start small and increase until
+           failure_detector_status.imbalanced_prop_metric reaches the desired
+           test range. -->
+      <enableRotorImbalance>false</enableRotorImbalance>
+      <!-- Force amplitude at rotorImbalanceReferenceRpm. Unit: N. -->
+      <rotorImbalanceForceAtReferenceRpmN>1000.0</rotorImbalanceForceAtReferenceRpmN>
+      <!-- Reference RPM for the quadratic force scaling. -->
+      <rotorImbalanceReferenceRpm>70.0</rotorImbalanceReferenceRpm>
+      <!-- Phase offset of the imbalance force relative to plugin rotor azimuth. -->
+      <rotorImbalancePhaseDeg>0.0</rotorImbalancePhaseDeg>
+      <!-- Application point in base_link/model coordinates. The default is the
+           main rotor hub height, so the lateral force also excites body moment. -->
+      <rotorImbalanceApplicationPointM>0 0 0.694</rotorImbalanceApplicationPointM>
+      <!-- Debug prints for applied imbalance force. -->
+      <printRotorImbalanceDebug>false</printRotorImbalanceDebug>
+      <rotorImbalanceDebugIntervalSec>1.0</rotorImbalanceDebugIntervalSec>
+
+      <!-- ================================================================== -->
       <!-- Azimuth-based cyclic pitch                                          -->
       <!-- ================================================================== -->
       <!-- useCyclicPitch:
@@ -1332,6 +1362,44 @@
       <robotNamespace />
       <linkName>/imu_link</linkName>
       <imuTopic>/imu</imuTopic>
+      <!-- SITL-only engine/prop IMU harmonics. This is gated by PX4 engine
+           output so preflight and arming see the nominal IMU. This setting is
+           a stress-test vibration profile, with the main horizontal peak moved
+           near the 52 Hz component seen in log_128. A smooth 12 s envelope
+           moves the amplitude between about 0.9x and 1.1x. This is intended
+           to push the PX4 vibration metric toward 100, not for nominal SITL
+           behavior. No burst term is used here. -->
+      <enableEngineImuVibration>true</enableEngineImuVibration>
+      <engineImuVibrationGateByMotorCommand>true</engineImuVibrationGateByMotorCommand>
+      <engineImuVibrationMotorCommandTopic>~/rising_star/gazebo/command/motor_speed</engineImuVibrationMotorCommandTopic>
+      <engineImuVibrationMotorSpeedScale>1000.0</engineImuVibrationMotorSpeedScale>
+      <engineImuVibrationMotorThreshold>0.05</engineImuVibrationMotorThreshold>
+      <engineImuVibrationCommandTimeoutSec>0.5</engineImuVibrationCommandTimeoutSec>
+      <engineImuVibrationStartSec>3.0</engineImuVibrationStartSec>
+      <engineImuVibrationRampSec>2.0</engineImuVibrationRampSec>
+      <engineImuVibrationEnvelopeAmplitude>0.1</engineImuVibrationEnvelopeAmplitude>
+      <engineImuVibrationEnvelopePeriodSec>12.0</engineImuVibrationEnvelopePeriodSec>
+      <engineImuVibrationEnvelopePhaseDeg>0.0</engineImuVibrationEnvelopePhaseDeg>
+      <engineImuVibrationFreq1Hz>52.0</engineImuVibrationFreq1Hz>
+      <engineImuVibrationFreq2Hz>69.0</engineImuVibrationFreq2Hz>
+      <engineImuVibrationFreq3Hz>0.0</engineImuVibrationFreq3Hz>
+      <engineImuVibrationFreq4Hz>0.0</engineImuVibrationFreq4Hz>
+      <engineImuVibrationAccelAmp1Mps2>110 110 14</engineImuVibrationAccelAmp1Mps2>
+      <engineImuVibrationAccelAmp2Mps2>90 90 14</engineImuVibrationAccelAmp2Mps2>
+      <engineImuVibrationAccelAmp3Mps2>0 0 0</engineImuVibrationAccelAmp3Mps2>
+      <engineImuVibrationAccelAmp4Mps2>0 0 0</engineImuVibrationAccelAmp4Mps2>
+      <engineImuVibrationGyroAmp1Radps>0.30 0.30 0.04</engineImuVibrationGyroAmp1Radps>
+      <engineImuVibrationGyroAmp2Radps>0.25 0.25 0.05</engineImuVibrationGyroAmp2Radps>
+      <engineImuVibrationGyroAmp3Radps>0.00 0.00 0.00</engineImuVibrationGyroAmp3Radps>
+      <engineImuVibrationGyroAmp4Radps>0.00 0.00 0.00</engineImuVibrationGyroAmp4Radps>
+      <engineImuVibrationAccelPhase1Deg>0.0 90.0 0.0</engineImuVibrationAccelPhase1Deg>
+      <engineImuVibrationAccelPhase2Deg>45.0 135.0 90.0</engineImuVibrationAccelPhase2Deg>
+      <engineImuVibrationAccelPhase3Deg>0.0 0.0 0.0</engineImuVibrationAccelPhase3Deg>
+      <engineImuVibrationAccelPhase4Deg>0.0 0.0 0.0</engineImuVibrationAccelPhase4Deg>
+      <engineImuVibrationGyroPhase1Deg>0.0 90.0 0.0</engineImuVibrationGyroPhase1Deg>
+      <engineImuVibrationGyroPhase2Deg>45.0 135.0 90.0</engineImuVibrationGyroPhase2Deg>
+      <engineImuVibrationGyroPhase3Deg>0.0 0.0 0.0</engineImuVibrationGyroPhase3Deg>
+      <engineImuVibrationGyroPhase4Deg>0.0 0.0 0.0</engineImuVibrationGyroPhase4Deg>
       <gyroscopeNoiseDensity>0.00018665</gyroscopeNoiseDensity>
       <gyroscopeRandomWalk>3.8785e-05</gyroscopeRandomWalk>
       <gyroscopeBiasCorrelationTime>1000.0</gyroscopeBiasCorrelationTime>

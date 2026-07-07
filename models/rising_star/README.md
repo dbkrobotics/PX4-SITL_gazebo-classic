@@ -451,6 +451,86 @@ Future improvements:
 - torque saturation,
 - idle RPM.
 
+### Step 2.5: Optional Rotor Imbalance Disturbance
+
+The SITL model has a rotating lateral force that can be used to reproduce
+fixed-stand vibration and PX4 imbalanced-propeller detector behavior. The
+current Rising Star SDF keeps this knob disabled for nominal SITL and
+engine-IMU-harmonic tests; set it to `true` only when you want a physical
+rotating force on the airframe.
+
+```xml
+<enableRotorImbalance>false</enableRotorImbalance>
+<rotorImbalanceForceAtReferenceRpmN>1000.0</rotorImbalanceForceAtReferenceRpmN>
+<rotorImbalanceReferenceRpm>70.0</rotorImbalanceReferenceRpm>
+<rotorImbalancePhaseDeg>0.0</rotorImbalancePhaseDeg>
+<rotorImbalanceApplicationPointM>0 0 0.694</rotorImbalanceApplicationPointM>
+```
+
+The force scales with rotor speed squared:
+
+```text
+F_xy = forceAtReferenceRpm * (rpm / referenceRpm)^2
+```
+
+This is not a high-fidelity blade or engine model. It is a SITL disturbance
+knob for testing how PX4, QGC logs, and the Rising Star control path behave when
+the airframe sees a rotating hub disturbance. Do not enable this together with
+`enableEngineImuVibration` unless you are intentionally stacking disturbance
+sources.
+
+### Step 2.6: Optional Engine IMU Harmonics
+
+The IMU plugin also has a Rising Star SITL knob for high-frequency engine/prop
+harmonics. Unlike `enableRotorImbalance`, this does not apply a physical force
+to the airframe. It injects deterministic accel/gyro harmonic components into
+the simulated IMU message only. The disturbance is gated by PX4 engine output
+so preflight and arming checks see the nominal IMU.
+
+The plugin supports four harmonic slots. Slots 1 and 2 are enough for the
+current stress-test profile. Slots 3 and 4 can be left at zero, or used later to
+add a nearby frequency pair for fixed-stand-like beating. The example below
+moves the main horizontal peak near the 52 Hz component seen in `log_128`, then
+applies a smooth envelope so the vibration amplitude rises and falls over time
+instead of staying constant.
+
+```xml
+<enableEngineImuVibration>true</enableEngineImuVibration>
+<engineImuVibrationGateByMotorCommand>true</engineImuVibrationGateByMotorCommand>
+<engineImuVibrationMotorCommandTopic>~/rising_star/gazebo/command/motor_speed</engineImuVibrationMotorCommandTopic>
+<engineImuVibrationMotorSpeedScale>1000.0</engineImuVibrationMotorSpeedScale>
+<engineImuVibrationMotorThreshold>0.05</engineImuVibrationMotorThreshold>
+<engineImuVibrationCommandTimeoutSec>0.5</engineImuVibrationCommandTimeoutSec>
+<engineImuVibrationStartSec>3.0</engineImuVibrationStartSec>
+<engineImuVibrationRampSec>2.0</engineImuVibrationRampSec>
+<engineImuVibrationEnvelopeAmplitude>0.1</engineImuVibrationEnvelopeAmplitude>
+<engineImuVibrationEnvelopePeriodSec>12.0</engineImuVibrationEnvelopePeriodSec>
+<engineImuVibrationEnvelopePhaseDeg>0.0</engineImuVibrationEnvelopePhaseDeg>
+<engineImuVibrationFreq1Hz>52.0</engineImuVibrationFreq1Hz>
+<engineImuVibrationFreq2Hz>69.0</engineImuVibrationFreq2Hz>
+<engineImuVibrationFreq3Hz>0.0</engineImuVibrationFreq3Hz>
+<engineImuVibrationFreq4Hz>0.0</engineImuVibrationFreq4Hz>
+<engineImuVibrationAccelAmp1Mps2>110.0 110.0 14.0</engineImuVibrationAccelAmp1Mps2>
+<engineImuVibrationAccelAmp2Mps2>90.0 90.0 14.0</engineImuVibrationAccelAmp2Mps2>
+<engineImuVibrationAccelAmp3Mps2>0.0 0.0 0.0</engineImuVibrationAccelAmp3Mps2>
+<engineImuVibrationAccelAmp4Mps2>0.0 0.0 0.0</engineImuVibrationAccelAmp4Mps2>
+<engineImuVibrationGyroAmp1Radps>0.30 0.30 0.04</engineImuVibrationGyroAmp1Radps>
+<engineImuVibrationGyroAmp2Radps>0.25 0.25 0.05</engineImuVibrationGyroAmp2Radps>
+<engineImuVibrationGyroAmp3Radps>0.00 0.00 0.00</engineImuVibrationGyroAmp3Radps>
+<engineImuVibrationGyroAmp4Radps>0.00 0.00 0.00</engineImuVibrationGyroAmp4Radps>
+```
+
+The envelope multiplies all harmonic slots by:
+
+```text
+scale = 1 + envelopeAmplitude * sin(2*pi*t / envelopePeriod + phase)
+```
+
+With the values above, the vibration moves smoothly between about `0.9x` and
+`1.1x` every 12 seconds. No burst term is used here. If the simulated vibration
+becomes too aggressive, reduce the envelope amplitude or accel amplitudes
+before changing estimator or preflight settings.
+
 ### Step 3: Azimuth-Based Cyclic Pitch
 
 This is the next major functional step.
