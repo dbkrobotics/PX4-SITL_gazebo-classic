@@ -682,7 +682,8 @@ void GimbalControllerPlugin::SendGimbalDeviceInformation()
     pitchMin,
     pitchMax,
     yawMin,
-    yawMax);
+    yawMax,
+    0); // gimbal_device_id: unused when manager and device are separate components.
   SendMavlinkMessage(msg);
 }
 
@@ -729,7 +730,8 @@ void GimbalControllerPlugin::SendGimbalDeviceAttitudeStatus()
     angularVelocity.Z(),
     failureFlags,
     NAN, // per mavlink spec - NAN if unknown
-    NAN); // per mavlink spec - NAN if unknown
+    NAN, // per mavlink spec - NAN if unknown
+    0); // gimbal_device_id: unused when manager and device are separate components.
   SendMavlinkMessage(msg);
 }
 
