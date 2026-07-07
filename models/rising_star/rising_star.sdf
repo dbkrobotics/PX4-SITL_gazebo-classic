@@ -847,9 +847,9 @@
            an aerodynamic truth model. Start small and increase until
            failure_detector_status.imbalanced_prop_metric reaches the desired
            test range. -->
-      <enableRotorImbalance>false</enableRotorImbalance>
+      <enableRotorImbalance>true</enableRotorImbalance>
       <!-- Force amplitude at rotorImbalanceReferenceRpm. Unit: N. -->
-      <rotorImbalanceForceAtReferenceRpmN>1000.0</rotorImbalanceForceAtReferenceRpmN>
+      <rotorImbalanceForceAtReferenceRpmN>5.0</rotorImbalanceForceAtReferenceRpmN>
       <!-- Reference RPM for the quadratic force scaling. -->
       <rotorImbalanceReferenceRpm>70.0</rotorImbalanceReferenceRpm>
       <!-- Phase offset of the imbalance force relative to plugin rotor azimuth. -->
@@ -1369,7 +1369,7 @@
            moves the amplitude between about 0.9x and 1.1x. This is intended
            to push the PX4 vibration metric toward 100, not for nominal SITL
            behavior. No burst term is used here. -->
-      <enableEngineImuVibration>true</enableEngineImuVibration>
+      <enableEngineImuVibration>false</enableEngineImuVibration>
       <engineImuVibrationGateByMotorCommand>true</engineImuVibrationGateByMotorCommand>
       <engineImuVibrationMotorCommandTopic>~/rising_star/gazebo/command/motor_speed</engineImuVibrationMotorCommandTopic>
       <engineImuVibrationMotorSpeedScale>1000.0</engineImuVibrationMotorSpeedScale>
