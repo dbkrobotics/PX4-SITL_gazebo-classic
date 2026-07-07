@@ -847,7 +847,7 @@
            an aerodynamic truth model. Start small and increase until
            failure_detector_status.imbalanced_prop_metric reaches the desired
            test range. -->
-      <enableRotorImbalance>true</enableRotorImbalance>
+      <enableRotorImbalance>false</enableRotorImbalance>
       <!-- Force amplitude at rotorImbalanceReferenceRpm. Unit: N. -->
       <rotorImbalanceForceAtReferenceRpmN>5.0</rotorImbalanceForceAtReferenceRpmN>
       <!-- Reference RPM for the quadratic force scaling. -->
