@@ -1,7 +1,7 @@
 #pragma once
 
-#ifdef MAVLINK_DEVELOPMENT
+#if defined(MAVLINK_DEVELOPMENT) || __has_include(<development/mavlink.h>)
 #include <development/mavlink.h>
-#else // MAVLINK_DEVELOPMENT
+#else
 #include <common/mavlink.h>
-#endif // MAVLINK_DEVELOPMENT
+#endif
