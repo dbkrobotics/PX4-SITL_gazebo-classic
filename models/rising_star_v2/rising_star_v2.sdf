@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <sdf version="1.6">
-  <model name="rising_star">
+  <model name="rising_star_v2">
     <!-- ====================================================================== -->
     <!-- DOCUMENTATION HEADER                                                    -->
     <!-- ====================================================================== -->
     <!--
-      Rising Star PX4 Gazebo Classic model.
+      Rising Star v2 PX4 Gazebo Classic model.
 
       Current model features:
         - two large rotor blades
@@ -15,8 +15,8 @@
         - fixed barbell plate payload mass
         - tripod mast between base and rotor hub
         - no visible base box
-        - 11 degree pre-cone on blades
-        - 6 ft teeter beam with 11 ft post-repair blades
+        - 7 degree pre-cone on blades
+        - 4 ft teeter beam with 12 ft blades
         - 28 ft nominal rotor diameter
 
       This is an intermediate engineering model.
@@ -341,11 +341,11 @@
 
       <!-- Central teeter pivot marker.
            This is the lower center point of the V shape:
-           right beam endpoint 1 =  0.0000 0 -0.1778
-           left  beam endpoint 1 =  0.0000 0 -0.1778
+           right beam endpoint 1 =  0.0000 0 -0.0748494683
+           left  beam endpoint 1 =  0.0000 0 -0.0748494683
       -->
       <visual name="teeter_center_pivot_visual">
-        <pose>0 0 -0.1778 0 0 0</pose>
+        <pose>0 0 -0.0748494683 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.075</radius>
@@ -378,20 +378,20 @@
 
       <!-- Left teeter beam: center pivot -> blade_2_visual root (+Y span) -->
       <collision name="teeter_beam_right_collision">
-        <pose>0 0.4572 -0.0889 -1.37881010908 0 0</pose>
+        <pose>0 0.3048 -0.0374247342 -1.448623279155 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
-            <length>0.9316</length>
+            <length>0.6141779896</length>
           </cylinder>
         </geometry>
       </collision>
       <visual name="teeter_beam_right_visual">
-        <pose>0 0.4572 -0.0889 -1.37881010908 0 0</pose>
+        <pose>0 0.3048 -0.0374247342 -1.448623279155 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
-            <length>0.9316</length>
+            <length>0.6141779896</length>
           </cylinder>
         </geometry>
         <material>
@@ -402,20 +402,20 @@
 
       <!-- Right teeter beam: center pivot -> blade_1_visual root (-Y span) -->
       <collision name="teeter_beam_left_collision">
-        <pose>0 -0.4572 -0.0889 1.37881010908 0 0</pose>
+        <pose>0 -0.3048 -0.0374247342 1.448623279155 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
-            <length>0.9316</length>
+            <length>0.6141779896</length>
           </cylinder>
         </geometry>
       </collision>
       <visual name="teeter_beam_left_visual">
-        <pose>0 -0.4572 -0.0889 1.37881010908 0 0</pose>
+        <pose>0 -0.3048 -0.0374247342 1.448623279155 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.05</radius>
-            <length>0.9316</length>
+            <length>0.6141779896</length>
           </cylinder>
         </geometry>
         <material>
@@ -426,7 +426,7 @@
 
       <!-- Optional root clamps to make the blade connection obvious. -->
       <visual name="blade_1_root_clamp_visual">
-        <pose>0 -0.9144 0.0000 0 0 0</pose>
+        <pose>0 -0.6096 0.0000 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.07</radius>
@@ -438,7 +438,7 @@
         </material>
       </visual>
       <visual name="blade_2_root_clamp_visual">
-        <pose>0 0.9144 0.0000 0 0 0</pose>
+        <pose>0 0.6096 0.0000 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.07</radius>
@@ -451,7 +451,7 @@
       </visual>
 
       <visual name="tip_weight_1_visual">
-        <pose>0 -4.2055996207 0.6397443997 0 0 0</pose>
+        <pose>0 -4.2399368042 0.4457493104 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.08</radius>
@@ -459,7 +459,7 @@
         </geometry>
       </visual>
       <visual name="tip_weight_2_visual">
-        <pose>0 4.2055996207 0.6397443997 0 0 0</pose>
+        <pose>0 4.2399368042 0.4457493104 0 0 0</pose>
         <geometry>
           <sphere>
             <radius>0.08</radius>
@@ -557,7 +557,7 @@
          lift is applied by the plugin; collisions here would inject contact
          forces while the plugin kinematically moves the links. -->
     <link name="blade_1_pitch_link">
-      <pose>0 -2.5599998103 1.0138721998 0 -0.191986 -1.57079632679</pose>
+      <pose>0 -2.4247684021 0.9168746552 0 -0.12217304764 -1.57079632679</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <kinematic>true</kinematic>
@@ -575,7 +575,7 @@
       <visual name="blade_1_visual">
         <geometry>
           <box>
-            <size>3.3528 0.2667 0.035</size>
+            <size>3.6576 0.2667 0.035</size>
           </box>
         </geometry>
         <material>
@@ -586,7 +586,7 @@
     </link>
 
     <link name="blade_2_pitch_link">
-      <pose>0 2.5599998103 1.0138721998 0 -0.191986 1.57079632679</pose>
+      <pose>0 2.4247684021 0.9168746552 0 -0.12217304764 1.57079632679</pose>
       <gravity>false</gravity>
       <self_collide>false</self_collide>
       <kinematic>true</kinematic>
@@ -604,7 +604,7 @@
       <visual name="blade_2_visual">
         <geometry>
           <box>
-            <size>3.3528 0.2667 0.035</size>
+            <size>3.6576 0.2667 0.035</size>
           </box>
         </geometry>
         <material>
@@ -986,7 +986,7 @@
 
            The plugin subscribes using Gazebo transport.
       -->
-      <px4ActuatorTopic>~/rising_star/gazebo/command/motor_speed</px4ActuatorTopic>
+      <px4ActuatorTopic>~/rising_star_v2/gazebo/command/motor_speed</px4ActuatorTopic>
 
       <!-- px4InputMode:
            motor_speed = subscribe to mav_msgs::msgs::CommandMotorSpeed.
@@ -1166,13 +1166,13 @@
       <!-- Rotor metadata -->
       <!-- rotorRadiusFt:
            Nominal rotor radius from center to blade tip:
-             3 ft beam half-span + 11 ft repaired blade = 14 ft.
+             2 ft beam half-span + 12 ft blade = 14 ft.
            The nominal rotor diameter is therefore 28 ft. -->
       <rotorRadiusFt>14.0</rotorRadiusFt>
       <!-- hubRadiusFt:
            Teeter-beam half-span / blade start radius.
-           The v1 beam is 6 ft root-to-root, so this is 3 ft. -->
-      <hubRadiusFt>3.0</hubRadiusFt>
+           The v2 beam is 4 ft root-to-root, so this is 2 ft. -->
+      <hubRadiusFt>2.0</hubRadiusFt>
       <!-- numBlades:
            Number of large rotor blades. -->
       <numBlades>2</numBlades>
@@ -1220,13 +1220,13 @@
       <teeterAngleLimitDeg>15.0</teeterAngleLimitDeg>
       <!-- preConeAngleDeg:
            Blade pre-cone angle.
-           Given value: about 11 deg.
+           Rising Star v2 value: 7 deg.
 
            Implemented:
              blade visual/collision tilted upward
              tip weights raised
              blade force application points include pre-cone offset -->
-      <preConeAngleDeg>11.0</preConeAngleDeg>
+      <preConeAngleDeg>7.0</preConeAngleDeg>
       <!-- gyroPrecessionTorqueFtLb:
            Gyroscopic precession torque metadata.
            Not directly used yet. -->
@@ -1376,7 +1376,7 @@
            behavior. No burst term is used here. -->
       <enableEngineImuVibration>false</enableEngineImuVibration>
       <engineImuVibrationGateByMotorCommand>true</engineImuVibrationGateByMotorCommand>
-      <engineImuVibrationMotorCommandTopic>~/rising_star/gazebo/command/motor_speed</engineImuVibrationMotorCommandTopic>
+      <engineImuVibrationMotorCommandTopic>~/rising_star_v2/gazebo/command/motor_speed</engineImuVibrationMotorCommandTopic>
       <engineImuVibrationMotorSpeedScale>1000.0</engineImuVibrationMotorSpeedScale>
       <engineImuVibrationMotorThreshold>0.05</engineImuVibrationMotorThreshold>
       <engineImuVibrationCommandTimeoutSec>0.5</engineImuVibrationCommandTimeoutSec>

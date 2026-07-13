@@ -1,0 +1,71 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="rising_star_gps">
+    <link name="link">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.015</mass>
+        <inertia>
+          <ixx>1e-05</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1e-05</iyy>
+          <iyz>0</iyz>
+          <izz>1e-05</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <cylinder>
+            <radius>0.01</radius>
+            <length>0.002</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+          </script>
+        </material>
+      </visual>
+      <sensor name="gps" type="gps">
+        <pose>0 0 0 0 0 0</pose>
+        <!-- PX4 receives GPS samples at this rate. Faster teeter/rotor motion can alias into
+             the reported GPS position and velocity because the plugin samples discretely. -->
+        <update_rate>5.0</update_rate>
+        <always_on>true</always_on>
+        <visualize>false</visualize>
+        <plugin name="gps_plugin" filename="libgazebo_gps_plugin.so">
+          <robotNamespace></robotNamespace>
+          <!-- Rising Star GPS disturbance model:
+               - useParentLinkPose=true publishes this GPS link pose/velocity instead of the
+                 root vehicle pose/velocity. Since rising_star.sdf attaches this model to the
+                 teeter beam, moving the GPS mount farther from the teeter hinge increases the
+                 deterministic teeter-induced GPS motion. It does not scale the random noise
+                 values below.
+               - gpsNoise toggles only the random sensor-noise model. If gpsNoise=false, the
+                 random-walk and white-noise terms below are disabled, but teeter-induced link
+                 motion still remains when useParentLinkPose=true.
+               Useful SITL cases:
+                 clean baseline: useParentLinkPose=false, gpsNoise=false
+                 teeter only:    useParentLinkPose=true,  gpsNoise=false
+                 teeter + noise: useParentLinkPose=true,  gpsNoise=true -->
+          <useParentLinkPose>false</useParentLinkPose>
+          <gpsNoise>false</gpsNoise>
+          <!-- Slow random-walk drift of the horizontal GPS position bias. -->
+          <gpsXYRandomWalk>2.0</gpsXYRandomWalk>
+          <!-- Slow random-walk drift of the vertical GPS position bias. -->
+          <gpsZRandomWalk>4.0</gpsZRandomWalk>
+          <!-- Instant horizontal GPS position white noise. -->
+          <gpsXYNoiseDensity>2.0e-4</gpsXYNoiseDensity>
+          <!-- Instant vertical GPS position white noise. -->
+          <gpsZNoiseDensity>4.0e-4</gpsZNoiseDensity>
+          <!-- Instant horizontal GPS velocity white noise; this mainly shows up in vel_n/vel_e. -->
+          <gpsVXYNoiseDensity>0.2</gpsVXYNoiseDensity>
+          <!-- Instant vertical GPS velocity white noise; this mainly shows up in vel_d. -->
+          <gpsVZNoiseDensity>0.4</gpsVZNoiseDensity>
+        </plugin>
+      </sensor>
+    </link>
+  </model>
+</sdf>

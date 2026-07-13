@@ -77,11 +77,15 @@ private:
   std::normal_distribution<float> standard_normal_distribution_;
 
   bool gps_noise_;
+  bool use_parent_link_pose_{false};
+  bool parent_link_lookup_warned_{false};
 
   std::string model_name_;
+  std::string parent_link_name_;
 
   sensors::GpsSensorPtr parentSensor_;
   physics::ModelPtr model_;
+  physics::LinkPtr parent_link_;
   physics::WorldPtr world_;
   event::ConnectionPtr updateWorldConnection_;
   event::ConnectionPtr updateSensorConnection_;

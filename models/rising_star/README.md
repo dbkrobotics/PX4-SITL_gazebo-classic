@@ -1,8 +1,8 @@
-# Rising Star PX4 v1.13 Gazebo Classic Model
+# Rising Star PX4 Gazebo Classic Model
 
 ## 1. Project Purpose
 
-This package is a custom Gazebo Classic model for a non-standard two-blade rotorcraft intended for PX4 v1.13 SITL development.
+This package is a custom Gazebo Classic model for a non-standard two-blade rotorcraft used for PX4 SITL development.
 
 The aircraft concept is not a conventional quadrotor or a conventional swashplate helicopter. The current design concept includes:
 
@@ -171,19 +171,34 @@ This is represented in:
 - tip weight position,
 - blade lift force application point.
 
+### 2.10 GPS Link Pose Experiment
+
+SITL uses `model://rising_star_gps` instead of the common `model://gps`.
+This variant keeps the same GPS noise settings but enables
+`useParentLinkPose`, so the GPS plugin publishes the GPS sensor link pose and
+velocity instead of the root model pose and velocity.
+
+For the teeter-beam GPS experiment, `gps0::link` is fixed to
+`teeter_beam_link` at `z = 0.894 m`, about `0.20 m` above the hinge center.
+At `+/-15 deg` teeter this creates about `+/-5.2 cm` lateral GPS motion.
+
 ---
 
 ## 3. Main Design Data Reflected in the Model
 
 | Parameter                 |        Value |
 | ------------------------- | -----------: |
-| Rotor radius              |        12 ft |
-| Hub radius                |         3 ft |
+| Version                   | Post-repair v1 |
+| Teeter beam               | 6 ft root-to-root |
+| Blade length              |   11 ft each |
+| Rotor radius              |        14 ft |
+| Rotor diameter            |        28 ft |
+| Blade start radius        |         3 ft |
 | Number of blades          |            2 |
 | Chord                     |      10.5 in |
 | Airfoil                   |   NACA 23015 |
 | Max RPM                   |      220 rpm |
-| Tip speed                 |     276 ft/s |
+| Tip speed                 |   322.5 ft/s |
 | Tip weight                | 2.53 lb each |
 | Empty weight              |        42 lb |
 | Design gross weight       |       440 lb |
@@ -345,6 +360,32 @@ Suggested tests:
 ```
 
 Current implementation includes visual blade pre-cone and pre-cone force application point.
+
+The post-repair v1 dimensions use a 6 ft teeter beam and two 11 ft blades:
+
+```text
+rotor diameter = 6 ft beam + 2 * 11 ft blade = 28 ft
+```
+
+`rotorRadiusFt` is the complete center-to-tip radius, while `hubRadiusFt` is
+the beam half-span and blade start radius. The aerodynamic blade span is their
+difference, not the full `rotorRadiusFt` value.
+
+### V1 and V2 Geometry
+
+| Parameter | Post-repair v1 | V2 |
+| --- | ---: | ---: |
+| Teeter beam | 6 ft | 4 ft / 48 in |
+| Blade length | 11 ft | 12 ft |
+| Nominal rotor diameter | 28 ft | 28 ft |
+| Pre-cone | 11 deg | 7 deg |
+| Teeter hinge limit | +/-15 deg | +/-15 deg |
+| Horizontal projected tip-to-tip | 27.60 ft | 27.82 ft |
+
+The nominal diameter adds beam and blade lengths. The horizontal projected
+diameter is slightly smaller because the blades rise through the pre-cone
+angle. Pre-cone is the fixed upward blade geometry; the teeter angle is the
+dynamic seesaw motion of the complete beam and remains limited to `+/-15 deg`.
 
 ---
 

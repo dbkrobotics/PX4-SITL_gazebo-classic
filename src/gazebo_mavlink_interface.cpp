@@ -802,8 +802,15 @@ void GazeboMavlinkInterface::ImuCallback(ImuPtr& imu_message)
     const common::Time now = world_->GetSimTime();
 #endif
 
-    if ((now - fake_as5600_last_ulog_time_).Double() >= fake_as5600_ulog_interval_s_) {
-      fake_as5600_last_ulog_time_ = now;
+    const double publish_elapsed_sec = (now - fake_as5600_last_ulog_time_).Double();
+
+    if (publish_elapsed_sec >= fake_as5600_ulog_interval_s_) {
+      // Preserve the requested average encoder rate when the simulation update
+      // interval is not an integer divisor of the publication interval. Using
+      // `now` here turns 5 ms at a 4 ms lockstep into 8 ms (125 Hz).
+      const double elapsed_intervals = std::floor(publish_elapsed_sec / fake_as5600_ulog_interval_s_);
+      fake_as5600_last_ulog_time_ = common::Time(
+          fake_as5600_last_ulog_time_.Double() + elapsed_intervals * fake_as5600_ulog_interval_s_);
 
       mavlink_debug_vect_t debug_vect{};
       debug_vect.time_usec = now.Double() * 1e6;
