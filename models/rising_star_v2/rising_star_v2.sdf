@@ -1163,6 +1163,13 @@
       <bladeElementSections>12</bladeElementSections>
       <bladeElementLiftScale>0.0</bladeElementLiftScale>
 
+      <!-- Keep collective in charge of total rotor lift while cyclic pitch
+           redistributes non-negative lift between the two blades. This avoids
+           the legacy CL=0 clipping artifact where large cyclic increased total
+           lift. The realized mean after blade-pitch clamps is retained, so
+           actuator saturation can still change collective. -->
+      <preserveCyclicMeanLift>true</preserveCyclicMeanLift>
+
       <!-- Rotor metadata -->
       <!-- rotorRadiusFt:
            Nominal rotor radius from center to blade tip:

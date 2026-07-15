@@ -189,6 +189,7 @@ public:
     this->ReadDouble(sdf, "bladeLiftSlopePerRad", this->blade_lift_slope_per_rad_);
     this->ReadInt(sdf, "bladeElementSections", this->blade_element_sections_);
     this->ReadDouble(sdf, "bladeElementLiftScale", this->blade_element_lift_scale_);
+    this->ReadBool(sdf, "preserveCyclicMeanLift", this->preserve_cyclic_mean_lift_);
 
     // Metadata.
     this->ReadDouble(sdf, "rotorRadiusFt", this->rotor_radius_ft_);
@@ -648,6 +649,53 @@ private:
     return lift_n;
   }
 
+  struct BladeLiftPair
+  {
+    double blade1_n{0.0};
+    double blade2_n{0.0};
+    double raw_blade1_n{0.0};
+    double raw_blade2_n{0.0};
+    double collective_total_n{0.0};
+  };
+
+  BladeLiftPair ComputeBladeLiftPairNewton(
+    double omega, double blade1_pitch_deg, double blade2_pitch_deg) const
+  {
+    BladeLiftPair result;
+    result.raw_blade1_n = this->BladeLiftNewton(omega, blade1_pitch_deg);
+    result.raw_blade2_n = this->BladeLiftNewton(omega, blade2_pitch_deg);
+    result.blade1_n = result.raw_blade1_n;
+    result.blade2_n = result.raw_blade2_n;
+    result.collective_total_n = result.raw_blade1_n + result.raw_blade2_n;
+
+    if (!this->preserve_cyclic_mean_lift_) {
+      return result;
+    }
+
+    // Use the mean of the realized, pitch-clamped blade commands. This also
+    // preserves the real collective shift when just one blade hits a pitch or
+    // servo limit instead of hiding that actuator-saturation effect.
+    const double collective_pitch_deg = this->ClampPitchDeg(
+      0.5 * (blade1_pitch_deg + blade2_pitch_deg));
+    const double collective_blade_lift_n = std::max(
+      0.0, this->BladeLiftNewton(omega, collective_pitch_deg));
+
+    // The reduced-order model intentionally has no negative blade lift. Keep
+    // collective in charge of total lift, and use the independently computed
+    // blade forces only for cyclic imbalance. Bounding the imbalance by the
+    // collective blade lift keeps both corrected blade forces non-negative.
+    const double raw_imbalance_n =
+      0.5 * (result.raw_blade1_n - result.raw_blade2_n);
+    const double bounded_imbalance_n = std::max(
+      -collective_blade_lift_n,
+      std::min(raw_imbalance_n, collective_blade_lift_n));
+
+    result.blade1_n = collective_blade_lift_n + bounded_imbalance_n;
+    result.blade2_n = collective_blade_lift_n - bounded_imbalance_n;
+    result.collective_total_n = 2.0 * collective_blade_lift_n;
+    return result;
+  }
+
   double EmptyWeightNewton() const
   {
     return LbForceToN(this->empty_weight_lb_);
@@ -1076,6 +1124,10 @@ private:
           << "Blade element lift: " << (this->use_blade_element_lift_ ? "on" : "off")
           << ", sections: " << this->blade_element_sections_
           << ", scale: " << this->blade_element_lift_scale_ << "\n"
+          << "Cyclic lift coupling: "
+          << (this->preserve_cyclic_mean_lift_
+              ? "mean-preserving, non-negative blade forces"
+              : "independent blade lift (legacy)") << "\n"
           << "Physical payload: " << (this->payload_enabled_ ? "on" : "off")
           << ", mass: " << (this->payload_enabled_ ? this->payload_mass_lb_ : 0.0) << " lb"
           << ", offset from CoG: [" << this->payload_offset_from_cog_m_.X()
@@ -1171,8 +1223,10 @@ private:
 #endif
 
     this->rotor_link_->SetAngularVel(angular_vel);
-    const double blade1_lift_n = this->BladeLiftNewton(omega_cmd, blade1_pitch_cmd_deg);
-    const double blade2_lift_n = this->BladeLiftNewton(omega_cmd, blade2_pitch_cmd_deg);
+    const BladeLiftPair blade_lift = this->ComputeBladeLiftPairNewton(
+      omega_cmd, blade1_pitch_cmd_deg, blade2_pitch_cmd_deg);
+    const double blade1_lift_n = blade_lift.blade1_n;
+    const double blade2_lift_n = blade_lift.blade2_n;
     const double total_lift_n = blade1_lift_n + blade2_lift_n;
     this->teeter_angle_rad_ = this->TeeterHingeAngleRad();
     this->teeter_rate_rad_s_ = this->teeter_hinge_joint_->GetVelocity(0);
@@ -1232,6 +1286,9 @@ private:
                 << ", teeter = " << this->teeter_angle_rad_ * 180.0 / M_PI
                 << " deg, teeter_rate = " << this->teeter_rate_rad_s_ * 180.0 / M_PI << " deg/s"
                 << ", cyclic = [" << this->roll_cyclic_deg_ << ", " << this->pitch_cyclic_deg_ << "] deg"
+                << ", raw blade lift = [" << blade_lift.raw_blade1_n
+                << ", " << blade_lift.raw_blade2_n << "] N"
+                << ", collective lift target = " << blade_lift.collective_total_n << " N"
                 << ", total lift = " << total_lift_n << " N"
                 << ", net = " << net_n << " N"
                 << ", drive torque = " << this->DriveTorqueNewtonMeter(omega_cmd) << " N*m"
@@ -1386,6 +1443,7 @@ private:
   double blade_lift_slope_per_rad_{6.283185307179586};
   int blade_element_sections_{12};
   double blade_element_lift_scale_{0.0};
+  bool preserve_cyclic_mean_lift_{false};
 
   // Metadata.
   double rotor_radius_ft_{12.0};

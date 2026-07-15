@@ -1163,6 +1163,22 @@
       <bladeElementSections>12</bladeElementSections>
       <bladeElementLiftScale>0.0</bladeElementLiftScale>
 
+      <!-- preserveCyclicMeanLift:
+           true = collective (the mean of the two direct blade-pitch commands)
+             controls total rotor lift. Cyclic pitch only redistributes that
+             lift between the two blades to create a teetering moment.
+           false = evaluate both blade pitches independently (legacy model).
+
+           The blade-element-lite model intentionally does not produce
+           negative lift. With the legacy model, a large cyclic command can
+           drive one blade into the CL=0 clamp while the other blade keeps
+           gaining lift, artificially increasing total lift. Mean-preserving
+           mode retains non-negative blade forces and bounds the redistribution
+           before applying it, so no unlimited signed negative-lift model is
+           introduced. This does not change the hover design-point
+           auto-calibration above. -->
+      <preserveCyclicMeanLift>true</preserveCyclicMeanLift>
+
       <!-- Rotor metadata -->
       <!-- rotorRadiusFt:
            Nominal rotor radius from center to blade tip:

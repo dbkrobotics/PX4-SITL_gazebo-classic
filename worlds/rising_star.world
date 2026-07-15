@@ -43,7 +43,11 @@
       <ode>
         <solver>
           <type>quick</type>
-          <iters>10</iters>
+          <!-- The 300+ lb payload cases need enough contact iterations to keep
+               the tripod stationary. Low values create solver jitter that is
+               differentiated into false IMU acceleration and blocks EKF tilt
+               alignment while the vehicle is still on the ground. -->
+          <iters>100</iters>
           <sor>1.3</sor>
           <use_dynamic_moi_rescaling>0</use_dynamic_moi_rescaling>
         </solver>
